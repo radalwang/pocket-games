@@ -1,7 +1,7 @@
 // 离线缓存：第一次打开时把所有文件存到手机上，之后没有网络也能打开。
 // 发布新版本时改一下 VERSION，手机下次联网打开时会换成新文件。
 // 新增文件（比如新游戏）时，记得把路径加进 ASSETS。
-const VERSION = 'v0.2.0';
+const VERSION = 'v0.3.0';
 const CACHE = `pocket-games-${VERSION}`;
 const ASSETS = [
   './',
@@ -41,14 +41,30 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(
-        keys.filter((key) => key.startsWith('pocket-games-') && key !== CACHE).map((key) => caches.delete(key)),
-      ))
-      .then(() => self.clients.claim()),
-  );
+  const activation = (async () => {
+    const keys = await caches.keys();
+    const old = keys.filter((key) => key.startsWith('pocket-games-') && key !== CACHE);
+    await Promise.all(old.map((key) => caches.delete(key)));
+    await self.clients.claim();
+    return old.length > 0;
+  })();
+  event.waitUntil(activation);
+
+  // 有旧版缓存说明这是一次更新：把开着的页面刷新成新版，免得旧页面加载到新版的游戏文件。
+  // 带上 ?updated，页面据此提示“已更新”。第一次安装时不刷新。
+  // 不能放进上面的 waitUntil：激活完成前浏览器会扣住所有请求，包括这次刷新，两边会互相等死。
+  activation.then(async (updated) => {
+    if (!updated) return;
+    const windows = await self.clients.matchAll({ type: 'window' });
+    for (const client of windows) client.navigate(withUpdatedFlag(client.url)).catch(() => {});
+  });
 });
+
+function withUpdatedFlag(href) {
+  const url = new URL(href);
+  url.searchParams.set('updated', '');
+  return url.href;
+}
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;

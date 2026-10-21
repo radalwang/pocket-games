@@ -6,7 +6,8 @@ import { renderHome } from './views/home.js';
 import { renderLibrary } from './views/library.js';
 import { mountSearch, updateSearch } from './views/search.js';
 import { isPlayerOpen, openGame, updateMini } from './player.js';
-import { openSettings } from './settings.js';
+import { openSettings, VERSION } from './settings.js';
+import { toast } from './ui.js';
 
 const views = Object.fromEntries([...document.querySelectorAll('.view')].map((view) => [view.dataset.view, view]));
 const bodyOf = (name) => views[name].querySelector('.view-body');
@@ -70,6 +71,14 @@ mountSearch(bodyOf('search'));
 refresh();
 selectTab(prefs.get('tab', 'home'), { initial: true });
 updateMini();
+
+// 新版本装好后，sw.js 会带上 ?updated 刷新页面
+const here = new URL(window.location.href);
+if (here.searchParams.has('updated')) {
+  here.searchParams.delete('updated');
+  window.history.replaceState(null, '', here.href);
+  toast(`已更新到 ${VERSION}`);
+}
 
 if ('serviceWorker' in navigator && window.isSecureContext) {
   navigator.serviceWorker.register('sw.js').catch((err) => console.warn('离线缓存注册失败', err));

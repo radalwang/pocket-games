@@ -142,23 +142,32 @@
   100% { transform: scale(1); }
 }
 
-/* 数字越大颜色越热，和封面同一套橙粉色系 */
-.g2048 .v2 { background: #fff; color: #48484a; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
-.g2048 .v4 { background: #ffe9d2; color: #8c4a16; }
-.g2048 .v8 { background: #ff9f0a; }
-.g2048 .v16 { background: #ff8a3d; }
-.g2048 .v32 { background: #ff6d3d; }
-.g2048 .v64 { background: #ff533c; }
-.g2048 .v128 { background: #ff4565; }
-.g2048 .v256 { background: #f5367f; }
-.g2048 .v512 { background: #de3597; }
-.g2048 .v1024 { background: #b93bb4; }
-.g2048 .v2048 { background: linear-gradient(135deg, #ff2d6f, #8e5cff); box-shadow: 0 0 18px rgba(255, 45, 111, 0.45); }
-.g2048 .vmax { background: linear-gradient(135deg, #5e5ce6, #bf5af2); }
+/* 每个数字一组双色渐变，从 2 的浅杏色一路过渡到 2048 的深靛蓝，右上角一点光泽，和首页封面是同一种画法 */
+.g2048-face {
+  background:
+    radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.38), transparent 55%),
+    linear-gradient(135deg, var(--a), var(--b));
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
 
+.g2048 .v2 { --a: #fff6ec; --b: #ffe4cc; color: #9a4d12; text-shadow: none; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.g2048 .v4 { --a: #ffe2bd; --b: #ffc78f; color: #9a4d12; text-shadow: none; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.g2048 .v8 { --a: #ffc15a; --b: #ff9440; }
+.g2048 .v16 { --a: #ffa24a; --b: #ff6f3c; }
+.g2048 .v32 { --a: #ff8450; --b: #ff4f5a; }
+.g2048 .v64 { --a: #ff6363; --b: #ff2d6f; }
+.g2048 .v128 { --a: #ff5592; --b: #e0338f; }
+.g2048 .v256 { --a: #f0569f; --b: #b63fbd; }
+.g2048 .v512 { --a: #c856d8; --b: #8e48f5; }
+.g2048 .v1024 { --a: #9a63ff; --b: #5e5ce6; }
+.g2048 .v2048 { --a: #5e5ce6; --b: #25288f; box-shadow: 0 0 18px rgba(94, 92, 230, 0.45); }
+.g2048 .vmax { --a: #3a3fd0; --b: #11135c; box-shadow: 0 0 18px rgba(58, 63, 208, 0.45); }
+
+/* 深色模式下 2 和 4 太亮会刺眼，换成暖棕色；其余颜色本身够深，保持不变 */
 @media (prefers-color-scheme: dark) {
-  .g2048 .v2 { background: #3a3a3c; color: #f2f2f7; box-shadow: none; }
-  .g2048 .v4 { background: #4d3b2c; color: #ffd6a8; }
+  .g2048 .v2 { --a: #4a3a2f; --b: #3a2c23; color: #ffd9b3; box-shadow: none; }
+  .g2048 .v4 { --a: #5e4330; --b: #4b3322; color: #ffc78f; box-shadow: none; }
+  .g2048 .vmax { --a: #6e72ff; --b: #2b2f9e; }
 }
 
 .g2048-overlay {

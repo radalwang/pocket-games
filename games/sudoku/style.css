@@ -11,6 +11,7 @@
   --sd-wrong: #ff3b30;
   --sd-wrong-bg: #ffe5e3;
   --sd-seg-on: #fff;
+  --sd-badge: #6e6e73;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -33,6 +34,7 @@
     --sd-wrong: #ff6961;
     --sd-wrong-bg: #45201e;
     --sd-seg-on: #636366;
+    --sd-badge: var(--label-3);
   }
 }
 
@@ -282,7 +284,7 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--label-3);
+  background: var(--sd-badge);
   color: #fff;
   font-size: 10px;
   font-style: normal;

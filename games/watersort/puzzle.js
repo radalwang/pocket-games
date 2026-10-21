@@ -38,6 +38,15 @@ export function pour(tubes, from, to) {
   return n;
 }
 
+// 撤销一步：把倒过去的 count 层水倒回来。记录跟现在的局面对不上（比如存档坏了）就什么也不做，返回 false
+export function unpour(tubes, [from, to, count]) {
+  const a = tubes[from];
+  const b = tubes[to];
+  if (!a || !b || from === to || count < 1 || count > topRun(b) || a.length + count > CAPACITY) return false;
+  for (let k = 0; k < count; k++) a.push(b.pop());
+  return true;
+}
+
 export function hasMove(tubes) {
   for (let i = 0; i < tubes.length; i++) {
     for (let j = 0; j < tubes.length; j++) if (canPour(tubes, i, j)) return true;

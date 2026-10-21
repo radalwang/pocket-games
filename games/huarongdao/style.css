@@ -68,8 +68,10 @@
   min-width: 0;
 }
 
+/* “第 10 关 · 最少 123 步”在 iPhone SE 上也要一行放下 */
 .hrd-level-text small {
-  font-size: 12px;
+  font-size: 11px;
+  white-space: nowrap;
   color: var(--label-2);
 }
 
@@ -97,7 +99,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 64px;
+  width: 56px;
   border-radius: 14px;
   background: var(--fill);
 }
@@ -410,13 +412,11 @@
   text-overflow: ellipsis;
 }
 
+/* 两列的卡片在 iPhone SE 上很窄，“最好 123 步”也要一行放下 */
 .hrd-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
+  font-size: 11px;
+  white-space: nowrap;
   color: var(--label-2);
 }
 
 .hrd-card-meta.is-done { color: var(--hrd-done); font-weight: 600; }
-.hrd-card-meta svg { width: 12px; height: 12px; }

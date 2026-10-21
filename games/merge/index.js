@@ -67,6 +67,8 @@ function loadStyles() {
 
 const isValidSave = (saved) =>
   Array.isArray(saved?.cells) && saved.cells.length === SIZE * SIZE && saved.cells.every((v) => Number.isInteger(v) && v > 0);
+// 存档里的分数这类数应该是非负整数，不是的话就不用它
+const isCount = (n) => Number.isInteger(n) && n >= 0;
 
 class Game {
   constructor(root, ctx) {
@@ -103,25 +105,30 @@ class Game {
     } while (!hasPair(cells));
     this.build(cells);
     this.score = 0;
+    this.peak = 0; // 这一局合出来过的最大数，成绩记的是它
     this.won = false;
     this.keepPlaying = false;
     this.over = false;
     this.bestBefore = this.best;
     this.hideOverlay();
     this.updateScores();
+    this.updateLadder();
     this.save();
   }
 
   restore(saved) {
     this.build(saved.cells);
-    this.score = saved.score || 0;
+    this.score = isCount(saved.score) ? saved.score : 0;
+    // 旧存档没记这一项，就用棋盘上的最大数；它不会比棋盘上的最大数还大
+    this.peak = isCount(saved.peak) && saved.peak <= this.maxValue() ? saved.peak : this.maxValue();
     this.won = Boolean(saved.won);
     this.keepPlaying = Boolean(saved.keepPlaying);
     // 旧版本可能存下了“合到 10 后没有能合的、却没判结束”的局面，这里重新判断一次，并把结果存回去
     const stuck = !saved.over && !hasPair(this.values());
     this.over = Boolean(saved.over) || stuck;
-    this.bestBefore = saved.bestBefore ?? this.best;
+    this.bestBefore = isCount(saved.bestBefore) ? saved.bestBefore : this.best;
     this.updateScores();
+    this.updateLadder();
     if (stuck) this.save();
     if (this.over) this.showOver();
     else if (this.won && !this.keepPlaying) this.showWin();
@@ -139,7 +146,6 @@ class Game {
       this.place(tile);
       this.refs.tiles.append(tile.el);
     });
-    this.updateLadder();
   }
 
   // 建一个方块放进棋盘数据里，但先不放到页面上：补进来的新数字要等上一段动画播完才出现
@@ -147,6 +153,8 @@ class Game {
     const el = document.createElement('div');
     el.className = 'gmerge-tile';
     el.append(document.createElement('div'));
+    // 弹一下、抖一下播完就把类去掉，留着的话会一直盖住选中时的呼吸，下次换另一个动画也播不出来
+    el.addEventListener('animationend', () => el.classList.remove('is-merged', 'is-alone'));
     const tile = { value, r, c, el };
     this.byEl.set(el, tile);
     this.grid[r][c] = tile;
@@ -259,14 +267,14 @@ class Game {
       this.place(tile, GATHER_MS, 'ease-in');
     }
     target.value += 1;
+    this.peak = Math.max(this.peak, target.value);
 
     // 局面马上算好并存档，这样动画播到一半收起或退出也不会丢；画面上等收拢完再变数字、往下落
     const { falling, fresh } = this.drop();
     this.score += gained;
     this.best = this.ctx.submitRecord('score', this.score);
-    const max = this.maxValue();
-    this.ctx.submitRecord('max', max);
-    const reachedGoal = !this.won && max >= GOAL;
+    this.ctx.submitRecord('max', this.peak);
+    const reachedGoal = !this.won && this.peak >= GOAL;
     if (reachedGoal) this.won = true;
     // 合到目标的这一步也可能刚好没有能合的了，要一起判断，否则点“继续挑战”后会卡住
     if (!hasPair(this.values())) this.over = true;
@@ -362,20 +370,20 @@ class Game {
     }
   }
 
-  // 进度条：排着 1 到 10，棋盘上最大数以内的都点亮；超过 10 以后整排往后挪
+  // 进度条：排着 1 到 10，这一局合出来过的最大数以内的都点亮；超过 10 以后整排往后挪
   updateLadder() {
-    const max = this.maxValue();
-    const first = Math.max(GOAL, max) - GOAL + 1;
+    const { peak } = this;
+    const first = Math.max(GOAL, peak) - GOAL + 1;
     this.refs.ladder.innerHTML = Array.from({ length: GOAL }, (_, i) => {
       const n = first + i;
-      const state = n <= max ? `is-reached ${valueClass(n)}` : n === GOAL ? 'is-goal' : '';
+      const state = n <= peak ? `is-reached ${valueClass(n)}` : n === GOAL ? 'is-goal' : '';
       return `<span class="gmerge-step ${state}">${n}</span>`;
     }).join('');
   }
 
   save() {
-    const { score, won, keepPlaying, over, bestBefore } = this;
-    this.ctx.save({ cells: this.values(), score, won, keepPlaying, over, bestBefore }, {
+    const { score, peak, won, keepPlaying, over, bestBefore } = this;
+    this.ctx.save({ cells: this.values(), score, peak, won, keepPlaying, over, bestBefore }, {
       summary: over ? `本局结束 · ${fmt(score)} 分` : `${fmt(score)} 分 · 最大 ${this.maxValue()}`,
       finished: over,
     });
@@ -418,7 +426,7 @@ class Game {
 
   showOver() {
     const record = this.bestBefore > 0 && this.score > this.bestBefore;
-    this.showOverlay('没有可以合并的数字了', `这一局合到了 ${this.maxValue()}，得 ${fmt(this.score)} 分${record ? '，刷新了最高分！' : '。'}`, [
+    this.showOverlay('没有可以合并的数字了', `这一局合到了 ${this.peak}，得 ${fmt(this.score)} 分${record ? '，刷新了最高分！' : '。'}`, [
       { label: '再来一局', primary: true, onClick: () => this.newGame() },
     ]);
   }

@@ -375,7 +375,8 @@ class Sound {
         return;
       }
     }
-    if (this.ac.state === 'suspended') this.ac.resume().catch(() => {});
+    // 除了 suspended，iPhone 切到后台或来电后还会变成 interrupted，也要在点击时重新打开
+    if (this.ac.state !== 'running' && this.ac.state !== 'closed') this.ac.resume().catch(() => {});
   }
 
   ready() {
@@ -469,12 +470,24 @@ function loadStyles() {
 }
 
 const isNum = Number.isFinite;
+const isObj = (v) => typeof v === 'object' && v !== null;
+const isIndex = (i, list) => Number.isInteger(i) && i >= 0 && i < list.length;
 
+// 存档可能残缺或被改坏，除了类型还要看范围：分数带小数或负号画不出来，
+// 下一根水管离得太远或已经落在后面，会一口气生成一大堆水管
 function isValidRun(run) {
-  return Boolean(run)
-    && [run.score, run.dist, run.nextPipeAt, run.bird?.y, run.bird?.vy, run.bird?.rot].every(isNum)
-    && Array.isArray(run.pipes)
-    && run.pipes.every((p) => [p.wx, p.gapY, p.gap].every(isNum));
+  if (!isObj(run) || !isObj(run.bird) || !Array.isArray(run.pipes)) return false;
+  const { score, dist, nextPipeAt, bird, pipes } = run;
+  const ahead = nextPipeAt - dist;
+  return Number.isSafeInteger(score) && score >= 0
+    && isNum(dist) && dist >= 0 && dist < 1e9
+    && isNum(ahead) && ahead >= 0 && ahead < MAX_W + PIPE_SPACING * 2
+    && isNum(bird.y) && bird.y >= CEILING && bird.y <= GROUND_Y
+    && isNum(bird.vy) && isNum(bird.rot)
+    && pipes.length <= 8
+    && pipes.every((p) => isObj(p)
+      && [p.wx, p.gapY, p.gap].every(isNum)
+      && p.gap > 0 && p.gapY - p.gap / 2 >= 0 && p.gapY + p.gap / 2 <= GROUND_Y);
 }
 
 function circleHitsRect(cx, cy, r, x, y, w, h) {
@@ -549,13 +562,13 @@ class Game {
     this.state = 'paused';
     this.score = run.score;
     this.bestBefore = isNum(run.bestBefore) ? run.bestBefore : this.best;
-    this.skin = SKINS[run.skin] ? run.skin : 0;
+    this.skin = isIndex(run.skin, SKINS) ? run.skin : 0;
     this.dist = run.dist;
     this.nextPipeAt = run.nextPipeAt;
     this.lastGapY = isNum(run.lastGapY) ? run.lastGapY : null;
     this.bird = { ...run.bird };
     this.pipes = run.pipes.map(({ wx, gapY, gap, scored }) => ({ wx, gapY, gap, scored: Boolean(scored) }));
-    this.theme = this.themeFrom = THEMES[run.theme] ? run.theme : 0;
+    this.theme = this.themeFrom = isIndex(run.theme, THEMES) ? run.theme : 0;
     this.showPause();
     this.updateHud();
   }
@@ -593,6 +606,8 @@ class Game {
 
   flap() {
     if (this.state === 'ready') this.start();
+    // 倒数 3、2、1 的时候点一下就直接接着飞，不用干等
+    if (this.state === 'countdown') this.resumePlay();
     if (this.state !== 'playing') return;
     this.bird.vy = FLAP_SPEED;
     this.bird.rot = -0.42;
@@ -612,6 +627,13 @@ class Game {
     this.hideOverlay();
     this.state = 'countdown';
     this.countdown = COUNTDOWN;
+    this.updateHud();
+  }
+
+  // 从悬停开始接着飞，不沿用暂停前的下落速度，不然暂停时正往下掉，倒数一完就撞地，根本来不及点
+  resumePlay() {
+    this.state = 'playing';
+    this.bird.vy = 0;
     this.updateHud();
   }
 
@@ -702,10 +724,7 @@ class Game {
         break;
       case 'countdown':
         this.countdown -= dt;
-        if (this.countdown <= 0) {
-          this.state = 'playing';
-          this.updateHud();
-        }
+        if (this.countdown <= 0) this.resumePlay();
         break;
       case 'dying':
         this.fall(dt);
@@ -821,14 +840,19 @@ class Game {
     this.g.imageSmoothingEnabled = false;
   }
 
-  // 高度固定 256，宽度按可用区域的比例算，整张画面再等比放大
+  // 高度固定 256，宽度按可用区域的比例算，整张画面再等比放大。
+  // 放大倍数取到整数个物理像素，每个像素点才一样宽，不然有的宽 4 个物理像素、有的宽 5 个，滚动时会闪；
+  // 倍数往下取以后两边多出来的空，再加宽画布补上
   fit({ width, height }) {
     if (!width || !height) return;
-    const w = clamp(Math.round((H * width) / height), MIN_W, MAX_W);
+    const dpr = window.devicePixelRatio || 1;
+    const natural = clamp(Math.round((H * width) / height), MIN_W, MAX_W);
+    const fitted = Math.min(width / natural, height / H);
+    const scale = Math.floor(fitted * dpr) / dpr || fitted;
+    const w = clamp(Math.floor(width / scale), MIN_W, MAX_W);
     if (w !== this.W) this.setCanvasWidth(w);
-    const scale = Math.min(width / w, height / H);
-    this.refs.screen.style.width = `${Math.floor(w * scale)}px`;
-    this.refs.screen.style.height = `${Math.floor(H * scale)}px`;
+    this.refs.screen.style.width = `${w * scale}px`;
+    this.refs.screen.style.height = `${H * scale}px`;
     this.draw();
   }
 

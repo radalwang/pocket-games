@@ -3,12 +3,30 @@
 // 管子和水画在 canvas 上，这样管子倾斜时水面也能一直保持水平。
 // 规则、出题和求解在 puzzle.js。接口说明见 js/player.js。
 
-import { canPick, canPour, CAPACITY, COLOR_COUNT, generate, hasMove, isDone, isWon, pour, top } from './puzzle.js';
+import { canPick, canPour, CAPACITY, COLOR_COUNT, generate, hasMove, isDone, isWon, pour, top, unpour } from './puzzle.js';
 
 const LEVELS = { easy: '初级', medium: '中级', hard: '高级' };
 const UNDOS = 5;
 // 颜色按好不好区分排序，颜色少的难度只用前面几种
 const PALETTE = ['#ff3b30', '#2f6bff', '#ffd60a', '#34c759', '#b45cf2', '#ff9500', '#ff7ac3', '#5ad1fa', '#9c6a3d', '#a9a9b1'];
+// 每种颜色再配一个小图案，分不清颜色的时候看图案也能认出来，顺序跟 PALETTE 一一对应。
+// 图案半透明地叠在水上：深色的水上用白色，浅色的水上用黑色。水的颜色不随浅色、深色模式变，两种模式下都一样清楚
+const LIGHT_INK = 'rgba(255, 255, 255, 0.55)';
+const DARK_INK = 'rgba(0, 0, 0, 0.3)';
+const MARKS = [
+  ['dot', LIGHT_INK], // 红
+  ['ring', LIGHT_INK], // 蓝
+  ['triangle', DARK_INK], // 黄
+  ['plus', DARK_INK], // 绿
+  ['diamond', LIGHT_INK], // 紫
+  ['wave', DARK_INK], // 橙
+  ['star', DARK_INK], // 粉
+  ['cross', DARK_INK], // 青
+  ['square', LIGHT_INK], // 棕
+  ['stripes', DARK_INK], // 灰
+];
+// 图案的大小，以管宽为单位
+const MARK_SIZE = 0.4;
 
 // 管子的形状，以管宽为 1：每层水高 LAYER，装满后水面上方还空着 HEAD，底是半圆。
 // 半圆底比方底少装一点水，管子再加长一点补上，这样四层水正好装到 HEAD 下面
@@ -155,6 +173,89 @@ function roundRect(g, x, y, w, h, r) {
   g.closePath();
 }
 
+// 水平线 y 穿过管子的那一段的中点
+function middleAt(points, y) {
+  let left = Infinity;
+  let right = -Infinity;
+  points.forEach(([x1, y1], k) => {
+    const [x2, y2] = points[(k + 1) % points.length];
+    if (y1 >= y === y2 >= y) return;
+    const x = x1 + ((y - y1) / (y2 - y1)) * (x2 - x1);
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+  });
+  return (left + right) / 2;
+}
+
+// 小图案的画法：原点在正中，r 是半径；用线画的图案粗细都一样（见 drawMark）
+const scaled = (points, r) => points.map(([x, y]) => [x * r, y * r]);
+function segments(g, list, r) {
+  for (const [x1, y1, x2, y2] of list) {
+    g.moveTo(x1 * r, y1 * r);
+    g.lineTo(x2 * r, y2 * r);
+  }
+}
+const STAR = Array.from({ length: 10 }, (_, k) => {
+  const a = -Math.PI / 2 + (k * Math.PI) / 5;
+  const d = k % 2 ? 0.42 : 0.95;
+  return [d * Math.cos(a), d * Math.sin(a)];
+});
+const MARK_SHAPES = {
+  dot(g, r) {
+    g.arc(0, 0, r * 0.62, 0, Math.PI * 2);
+    g.fill();
+  },
+  ring(g, r) {
+    g.arc(0, 0, r * 0.6, 0, Math.PI * 2);
+    g.stroke();
+  },
+  triangle(g, r) {
+    trace(g, scaled([[0, -0.8], [0.86, 0.7], [-0.86, 0.7]], r), true);
+    g.fill();
+  },
+  plus(g, r) {
+    segments(g, [[-0.74, 0, 0.74, 0], [0, -0.74, 0, 0.74]], r);
+    g.stroke();
+  },
+  diamond(g, r) {
+    trace(g, scaled([[0, -0.92], [0.7, 0], [0, 0.92], [-0.7, 0]], r), true);
+    g.fill();
+  },
+  wave(g, r) {
+    for (let k = 0; k <= 16; k++) g.lineTo(((k / 16) * 1.6 - 0.8) * r, -Math.sin((k / 16) * Math.PI * 3) * 0.32 * r);
+    g.stroke();
+  },
+  star(g, r) {
+    trace(g, scaled(STAR, r), true);
+    g.fill();
+  },
+  cross(g, r) {
+    segments(g, [[-0.6, -0.6, 0.6, 0.6], [0.6, -0.6, -0.6, 0.6]], r);
+    g.stroke();
+  },
+  square(g, r) {
+    g.rect(-0.58 * r, -0.58 * r, 1.16 * r, 1.16 * r);
+    g.stroke();
+  },
+  stripes(g, r) {
+    segments(g, [[-0.72, -0.56, 0.72, -0.56], [-0.72, 0, 0.72, 0], [-0.72, 0.56, 0.72, 0.56]], r);
+    g.stroke();
+  },
+};
+
+// 在 size × size 的小画布正中画一种颜色的图案
+function drawMark(g, [kind, ink], size) {
+  const r = size / 2;
+  g.translate(r, r);
+  g.fillStyle = ink;
+  g.strokeStyle = ink;
+  g.lineWidth = r * 0.3;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.beginPath();
+  MARK_SHAPES[kind](g, r);
+}
+
 // ---------- 界面 ----------
 
 const RESTART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 3.8v3.9h3.9"/></svg>';
@@ -212,8 +313,14 @@ function isValidSave(saved) {
     && Array.isArray(tubes) && tubes.length >= start.length && tubes.length <= start.length + 1
     && tubes.every((tube) => isTube(tube, colors))
     && Array.isArray(history)
-    && history.every((move) => Array.isArray(move) && move.length === 3 && move.every(Number.isInteger)
-      && move[0] < tubes.length && move[1] < tubes.length);
+    && history.every((move) => Array.isArray(move) && move.length === 3 && move.every(Number.isInteger))
+    && canUndoAll(tubes, history.slice(-UNDOS));
+}
+
+// 留下来的几步撤销要能从现在的局面一步步倒回去，倒不回去说明存档坏了
+function canUndoAll(tubes, history) {
+  const copy = tubes.map((tube) => tube.slice());
+  return history.slice().reverse().every((move) => unpour(copy, move));
 }
 
 class WaterSort {
@@ -235,6 +342,8 @@ class WaterSort {
     this.waveAt = -Infinity;
     this.pendingWin = false;
     this.width = 0;
+    this.sprites = []; // 每种颜色的小图案，画好一次存起来
+    this.markPx = 0;
     this.raf = 0;
     this.lastFrame = 0;
 
@@ -347,7 +456,8 @@ class WaterSort {
     this.status = saved.status === 'won' ? 'won' : 'playing';
     this.record = saved.record ?? null;
     this.clearMotion();
-    this.born = [];
+    // 接着上次玩，管子不用再出场；每根都记上，之后加的空管才会排在对的位置上
+    this.born = this.tubes.map(() => -Infinity);
     this.layout(true);
     this.updateChrome();
   }
@@ -480,8 +590,15 @@ class WaterSort {
   undo() {
     if (this.status !== 'playing' || !this.history.length || !this.undosLeft) return;
     this.finishPours();
-    const [from, to, count] = this.history.pop();
-    for (let k = 0; k < count; k++) this.tubes[from].push(this.tubes[to].pop());
+    const move = this.history.pop();
+    if (!unpour(this.tubes, move)) {
+      // 记录跟局面对不上就不撤了，剩下的记录也不可信，一起扔掉
+      this.history = [];
+      this.updateChrome();
+      this.save();
+      return;
+    }
+    const [from] = move;
     this.undosLeft--;
     this.selected = -1;
     this.sealAll();
@@ -652,6 +769,12 @@ class WaterSort {
     const first = (roomH - w * units) / 2 + w * TOP_ROOM;
     this.width = w;
     this.slotWidth = slot;
+    // 管子大小变了，小图案按新的大小重画
+    const markPx = Math.ceil(MARK_SIZE * w * dpr);
+    if (markPx !== this.markPx) {
+      this.markPx = markPx;
+      this.sprites = [];
+    }
     this.slots = this.tubes.map((_, i) => {
       const row = Math.floor(i / perRow);
       const inRow = row < rows - 1 ? perRow : n - perRow * (rows - 1);
@@ -772,23 +895,37 @@ class WaterSort {
     const startTilt = tiltFor(p.volume);
     if (t < MOVE_MS) {
       const k = easeInOut(clamp01(t / MOVE_MS));
-      return {
+      return this.keepInside({
         x: lerp(home.x + pivot * w, spout.x, k),
         y: lerp(home.y - p.lift * LIFT * w, spout.y, k),
         angle: p.side * startTilt * k,
         pivot,
-      };
+      });
     }
     if (t < MOVE_MS + p.flow) {
       return { ...spout, angle: p.side * tiltFor(p.volume - p.count * this.poured(p, now)), pivot };
     }
     const k = easeInOut(clamp01((t - MOVE_MS - p.flow) / BACK_MS));
-    return {
+    return this.keepInside({
       x: lerp(spout.x, home.x + pivot * w, k),
       y: lerp(spout.y, home.y, k),
       angle: p.side * tiltFor(p.volume - p.count) * (1 - k),
       pivot,
-    };
+    });
+  }
+
+  // 飞过去、飞回来的路上管子还斜着，靠边那几根的管身会伸出画布，整根往里挪一点
+  keepInside(pose) {
+    const edge = Math.max(1.5, this.width * 0.06);
+    let left = Infinity;
+    let right = -Infinity;
+    for (const [x] of place(pose, this.width, RIMMED)) {
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+    }
+    if (left < edge) pose.x += edge - left;
+    else if (right > this.view.w - edge) pose.x -= right - (this.view.w - edge);
+    return pose;
   }
 
   // ---------- 画面 ----------
@@ -838,15 +975,22 @@ class WaterSort {
       maxX = Math.max(maxX, x);
       below = Math.max(below, y);
     }
+    // 多少水对应的水面在哪，画水和画图案都要用，算过的记下来；没有水时水面就在管底
+    const levels = new Map([[0, below]]);
+    const levelAt = (volume) => {
+      if (!levels.has(volume)) levels.set(volume, levelFor(points, volume, w));
+      return levels.get(volume);
+    };
     below += 1;
     let volume = 0;
     for (const band of bands) {
       volume += band.amount;
-      const level = levelFor(points, volume, w);
+      const level = levelAt(volume);
       g.fillStyle = PALETTE[band.color];
       g.fillRect(minX - 1, level, maxX - minX + 2, below - level + 0.5);
       below = level;
     }
+    this.drawMarks(points, bands, levelAt);
     // 玻璃反光：贴着左壁的一道亮条，跟着管子一起转
     g.translate(pose.x, pose.y);
     g.rotate(pose.angle);
@@ -864,6 +1008,44 @@ class WaterSort {
     g.stroke();
     if (cork !== undefined) this.drawCork(pose, cork, now);
     g.restore();
+  }
+
+  // 每层水正中贴一个这种颜色的图案，跟水面一样保持水平，不跟着管子转。
+  // 只露出这段水里面的部分：倒水时图案跟着水面一点点露出来或者没下去；管子斜过来、一层水变薄时图案也跟着变小
+  drawMarks(points, bands, levelAt) {
+    const g = this.g;
+    const w = this.width;
+    let start = 0;
+    for (const band of bands) {
+      const end = start + band.amount;
+      g.save();
+      g.beginPath();
+      g.rect(0, levelAt(end), this.view.w, levelAt(start) - levelAt(end));
+      g.clip();
+      // 从这段水的最下面一层往上数，每层一个
+      for (let k = start; k < end; k++) {
+        const lower = levelAt(k);
+        const upper = levelAt(k + 1);
+        const size = Math.min(MARK_SIZE * w, (lower - upper) * 0.8);
+        if (size < 3) continue;
+        const y = (lower + upper) / 2;
+        g.drawImage(this.sprite(band.color), middleAt(points, y) - size / 2, y - size / 2, size, size);
+      }
+      g.restore();
+      start = end;
+    }
+  }
+
+  // 图案先画在一块小画布上存起来，每帧直接贴上去；管子大小变了才重画（见 layout）
+  sprite(color) {
+    if (!this.sprites[color]) {
+      const canvas = document.createElement('canvas');
+      canvas.width = this.markPx;
+      canvas.height = this.markPx;
+      drawMark(canvas.getContext('2d'), MARKS[color], this.markPx);
+      this.sprites[color] = canvas;
+    }
+    return this.sprites[color];
   }
 
   // 排好的管子盖上软木塞，刚排好时从上面落下来

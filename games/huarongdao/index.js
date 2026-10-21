@@ -13,7 +13,6 @@ const RESTART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const UNDO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4.5 9.5 9 5"/><path d="M4.5 9.5h9.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
 const BULB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3Z"/></svg>';
 const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></svg>';
-const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
 
 // 配色分四类：曹操、关羽、其他大将、兵
 const colorOf = (piece) => (piece.kind === 'cao' || piece.kind === 'bing' ? piece.kind : piece.name === '关羽' ? 'guan' : 'general');
@@ -69,15 +68,18 @@ function loadStyles() {
   });
 }
 
-// 存档里的棋子都要在棋盘内，而且不能叠在一起
+// 存档里的棋子都要在棋盘内，而且不能叠在一起；记下的每一步也要指着有的棋子，起点在棋盘内
 function isValidSave(saved) {
   const level = getLevel(saved?.level);
   if (!level || !Array.isArray(saved.positions) || !Array.isArray(saved.history)) return false;
   const pieces = parseLayout(level.layout);
-  const { positions } = saved;
-  if (positions.length !== pieces.length || !positions.every((pos) => Array.isArray(pos) && pos.every(Number.isInteger))) return false;
+  const { positions, history } = saved;
+  const isSpot = (pos) => Array.isArray(pos) && pos.length === 2 && pos.every(Number.isInteger);
+  const inside = (p, [r, c]) => r >= 0 && c >= 0 && r + p.h <= ROWS && c + p.w <= COLS;
+  if (positions.length !== pieces.length || !positions.every(isSpot) || !pieces.every((p, id) => inside(p, positions[id]))) return false;
+  const stepOk = (step) => Number.isInteger(step?.id) && step.id >= 0 && step.id < pieces.length && isSpot(step.from) && inside(pieces[step.id], step.from);
+  if (!history.every(stepOk)) return false;
   positions.forEach(([r, c], id) => Object.assign(pieces[id], { r, c }));
-  if (!pieces.every((p) => p.r >= 0 && p.c >= 0 && p.r + p.h <= ROWS && p.c + p.w <= COLS)) return false;
   const area = pieces.reduce((sum, p) => sum + p.w * p.h, 0);
   return occupancy(pieces).filter((id) => id >= 0).length === area;
 }
@@ -215,7 +217,7 @@ class Huarongdao {
   renderPicker() {
     this.refs.picker.innerHTML = LEVELS.map((level, k) => {
       const best = this.records[level.id];
-      const meta = best ? `<span class="hrd-card-meta is-done">${CHECK}最好 ${best} 步</span>` : `<span class="hrd-card-meta">最少 ${level.min} 步</span>`;
+      const meta = best ? `<span class="hrd-card-meta is-done">最好 ${best} 步</span>` : `<span class="hrd-card-meta">最少 ${level.min} 步</span>`;
       return `
         <button class="hrd-card${level === this.level ? ' is-current' : ''}" data-level="${level.id}">
           ${preview(level)}
@@ -282,7 +284,15 @@ class Huarongdao {
     const last = this.status === 'playing' && this.history.pop();
     if (!last) return;
     const piece = this.pieces[last.id];
-    const route = routeTo(reachable(this.pieces, last.id), ...last.from);
+    const spots = piece && Array.isArray(last.from) && reachable(this.pieces, last.id);
+    // 存档里的步子和棋盘对不上（比如关卡布局改过），这一步退不回去：剩下的步子都不要了，免得把棋子挪到别的棋子上
+    if (!spots || !spots.has(cellAt(...last.from))) {
+      this.history = [];
+      this.updateChrome();
+      this.save();
+      return;
+    }
+    const route = routeTo(spots, ...last.from);
     [piece.r, piece.c] = last.from;
     this.place(last.id);
     this.animate(last.id, route);
@@ -361,13 +371,13 @@ class Huarongdao {
     const end = (e) => {
       if (!drag || e.pointerId !== drag.pointerId) return;
       // 手指抬起的位置也要算上，快速划动时最后一次 pointermove 可能还没到
-      if (e.type === 'pointerup') track(e);
+      track(e);
       const { id, el, moved, at, dir, t } = drag;
       const shown = dragPosition(drag);
       drag = null;
       el.classList.remove('is-held', 'is-dragging');
       if (!moved) {
-        if (e.type === 'pointerup') this.tap(id);
+        this.tap(id);
         return;
       }
       const piece = this.pieces[id];
@@ -380,7 +390,21 @@ class Huarongdao {
       }
     };
     layer.addEventListener('pointerup', end);
-    layer.addEventListener('pointercancel', end);
+
+    // 被系统打断（来电、切到后台）或者游戏页收起时，这次拖动作废：棋子回到拖动前的位置，不算一步
+    this.cancelDrag = () => {
+      if (!drag) return;
+      const { id, el } = drag;
+      const shown = dragPosition(drag);
+      drag = null;
+      el.classList.remove('is-held', 'is-dragging');
+      const { r, c } = this.pieces[id];
+      this.place(id);
+      this.animate(id, [shown, [r, c]]);
+    };
+    layer.addEventListener('pointercancel', (e) => {
+      if (drag && e.pointerId === drag.pointerId) this.cancelDrag();
+    });
   }
 
   // ---------- 画面 ----------
@@ -467,6 +491,11 @@ class Huarongdao {
     board.classList.toggle('is-won', won);
   }
 
+  // 收起游戏页或切到后台：正拖着的棋子放回原处
+  pause() {
+    this.cancelDrag();
+  }
+
   destroy() {
     clearTimeout(this.noteTimer);
   }
@@ -476,6 +505,6 @@ export default {
   async mount(root, ctx) {
     await loadStyles();
     const game = new Huarongdao(root, ctx);
-    return { destroy: () => game.destroy() };
+    return { pause: () => game.pause(), destroy: () => game.destroy() };
   },
 };

@@ -95,13 +95,15 @@ function gravityMs(level) {
   return (0.8 - n * 0.007) ** n * 1000;
 }
 
+// 字母键一律按小写查：按着 Shift 松开 A 时收到的是“A”，开着大写锁定时也一样，不然按键会松不开
 const KEYS = {
   ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'soft', ArrowUp: 'rotate',
   a: 'left', d: 'right', s: 'soft', w: 'rotate',
-  x: 'rotate', X: 'rotate', z: 'rotateBack', Z: 'rotateBack',
-  ' ': 'hard', c: 'hold', C: 'hold', Shift: 'hold',
-  p: 'pause', P: 'pause', Enter: 'confirm',
+  x: 'rotate', z: 'rotateBack',
+  ' ': 'hard', c: 'hold', Shift: 'hold',
+  p: 'pause', Enter: 'confirm',
 };
+const keyAction = ({ key = '' }) => KEYS[key.length === 1 ? key.toLowerCase() : key];
 
 const stroked = (body, width = 2.6) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
@@ -266,6 +268,8 @@ class Tetris {
     this.frame = this.frame.bind(this);
     this.onKey = this.onKey.bind(this);
     this.onKeyUp = this.onKeyUp.bind(this);
+    // 窗口失去焦点后收不到松开按键的事件，先当作全都松开了
+    this.onBlur = () => this.releaseAll();
     this.refs.pause.addEventListener('click', () => {
       this.refs.pause.blur();
       this.pause();
@@ -875,16 +879,18 @@ class Tetris {
     if (on) {
       document.addEventListener('keydown', this.onKey);
       document.addEventListener('keyup', this.onKeyUp);
+      window.addEventListener('blur', this.onBlur);
     } else {
       document.removeEventListener('keydown', this.onKey);
       document.removeEventListener('keyup', this.onKeyUp);
+      window.removeEventListener('blur', this.onBlur);
       this.releaseAll();
     }
   }
 
   onKey(e) {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('input, textarea')) return;
-    const action = KEYS[e.key];
+    const action = keyAction(e);
     if (!action) return;
     e.preventDefault();
     if (e.repeat) return;
@@ -899,7 +905,7 @@ class Tetris {
   }
 
   onKeyUp(e) {
-    const action = KEYS[e.key];
+    const action = keyAction(e);
     if (action) this.release(action);
   }
 

@@ -61,24 +61,43 @@ async function mountGame(game) {
   unmountGame();
   sheet.style.setProperty('--tint', game.cover.colors[1]);
   titleEl.innerHTML = `<span class="thumb">${cover(game)}</span><span>${esc(game.title)}</span>`;
-  const root = document.createElement('div');
-  root.className = 'game-root';
-  stage.replaceChildren(root);
 
-  try {
-    const instance = await module.default.mount(root, {
-      saved: progress.getSave(game.id)?.state ?? null,
+  const start = (saved) => {
+    const root = document.createElement('div');
+    root.className = 'game-root';
+    stage.replaceChildren(root);
+    return module.default.mount(root, {
+      saved,
       records: progress.getRecords(game.id),
       save: (state, info) => progress.setSave(game.id, state, info),
       submitRecord: (key, value, options) => progress.submitRecord(game.id, key, value, options),
     });
-    current = { game, instance: instance ?? {} };
-  } catch (err) {
+  };
+
+  const fail = (err) => {
     console.error(err);
     stage.replaceChildren();
     toast('游戏启动失败');
     return false;
+  };
+
+  const saved = progress.getSave(game.id)?.state ?? null;
+  let instance;
+  try {
+    instance = await start(saved);
+  } catch (err) {
+    if (saved === null) return fail(err);
+    // 存档读不出来（被截断、或是旧版本留下的格式）：丢掉存档重新开一局，免得以后每次打开都失败
+    console.error(err);
+    progress.clearSave(game.id);
+    try {
+      instance = await start(null);
+    } catch (retryErr) {
+      return fail(retryErr);
+    }
+    toast('存档读取失败，已重新开始');
   }
+  current = { game, instance: instance ?? {} };
   progress.touch(game.id);
   return true;
 }

@@ -13,6 +13,7 @@ function clock(ms) {
 }
 
 const minMoves = (n) => 2 ** n - 1;
+const startPegs = (n) => [Array.from({ length: n }, (_, k) => n - k), [], []];
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const tf = ({ x, y }) => `translate(${x}px, ${y}px)`;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -80,6 +81,21 @@ function isValidSave(saved) {
   return all.length === saved.discs && all.every((d, k) => d === k + 1);
 }
 
+// 从开局照着 history 一步步重放，每一步都得是合法的 [从哪根, 到哪根]；走不通返回 null
+function replay(n, history) {
+  const pegs = startPegs(n);
+  for (const move of history) {
+    if (!Array.isArray(move) || move.length !== 2) return null;
+    const [from, to] = move;
+    if (![0, 1, 2].includes(from) || ![0, 1, 2].includes(to) || from === to) return null;
+    const disc = pegs[from].at(-1);
+    const under = pegs[to].at(-1);
+    if (disc === undefined || (under !== undefined && under < disc)) return null;
+    pegs[to].push(pegs[from].pop());
+  }
+  return pegs;
+}
+
 class Hanoi {
   constructor(root, ctx) {
     this.ctx = ctx;
@@ -125,19 +141,20 @@ class Hanoi {
   }
 
   chooseLevel(n) {
-    if (n === this.discs && this.status !== 'won') return;
+    if (this.drag || (n === this.discs && this.status !== 'won')) return;
     if (this.playing && !window.confirm('换层数会放弃这一局，确定吗？')) return;
     this.newGame(n);
   }
 
   requestNewGame() {
+    if (this.drag) return;
     if (this.playing && !window.confirm('重新开始会放弃这一局，确定吗？')) return;
     this.newGame();
   }
 
   newGame(n = this.discs) {
     this.stopClock();
-    this.setup(n, [Array.from({ length: n }, (_, k) => n - k), [], []]);
+    this.setup(n, startPegs(n));
     this.moves = 0;
     this.history = [];
     this.elapsed = 0;
@@ -148,13 +165,23 @@ class Hanoi {
     this.save();
   }
 
+  // 局面已经由 isValidSave 查过，其余字段也可能是旧的、缺的或者坏的：
+  // 步骤记录要能从开局重放出存档里的局面，对不上就不要了（只是没法撤销）；赢没赢以局面为准
   restore(saved) {
-    this.setup(saved.discs, saved.pegs.map((stack) => [...stack]));
-    this.history = Array.isArray(saved.history) ? saved.history : [];
-    this.moves = saved.moves ?? this.history.length;
-    this.elapsed = saved.elapsed || 0;
-    this.status = saved.status ?? 'ready';
-    this.record = saved.record ?? null;
+    const { discs, pegs } = saved;
+    this.setup(discs, pegs.map((stack) => [...stack]));
+    const replayed = Array.isArray(saved.history) ? replay(discs, saved.history) : null;
+    if (replayed && JSON.stringify(replayed) === JSON.stringify(pegs)) {
+      this.history = saved.history;
+      this.moves = saved.history.length;
+    } else {
+      this.history = [];
+      this.moves = Number.isInteger(saved.moves) && saved.moves >= 0 ? saved.moves : 0;
+    }
+    this.elapsed = Number.isFinite(saved.elapsed) && saved.elapsed >= 0 ? saved.elapsed : 0;
+    const done = pegs[TARGET].length === discs;
+    this.status = done ? 'won' : this.moves || saved.status === 'playing' ? 'playing' : 'ready';
+    this.record = done && ['first', 'best'].includes(saved.record) ? saved.record : null;
     this.layout();
     this.updateChrome();
   }
@@ -166,7 +193,6 @@ class Hanoi {
     this.drag = null;
     this.clearMarks();
     const { board } = this.refs;
-    board.classList.remove('is-won');
     board.querySelectorAll('.hn-disc').forEach((el) => el.remove());
     // discEls[大小]，1 最小
     this.discEls = [null];
@@ -209,9 +235,10 @@ class Hanoi {
     this.startClock();
   }
 
-  // 每次操作：先清掉上一次的提示标记，做完后刷新界面并存档
+  // 每次操作：先清掉上一次的提示标记，做完后刷新界面并存档。
+  // 拖动途中（另一根手指点了撤销、提示）什么都不做，等松手以后再说，免得局面在手指底下变掉
   act(action) {
-    if (this.status === 'won' || !this.geo) return;
+    if (this.status === 'won' || !this.geo || this.drag) return;
     this.clearMarks();
     action();
     this.updateChrome();
@@ -232,7 +259,7 @@ class Hanoi {
         const disc = this.top(this.held);
         this.commit(this.held, peg, [this.liftPoint(disc, peg), this.stackPoint(disc, peg, this.pegs[peg].length)]);
       } else {
-        this.refuse(peg);
+        this.refuse(this.top(this.held), peg);
       }
     });
   }
@@ -257,9 +284,9 @@ class Hanoi {
     this.fly(disc, [this.stackPoint(disc, peg, this.pegs[peg].length - 1)]);
   }
 
-  // 大盘不能压小盘：手上的圆盘摇一下，目标柱上挡路的那个圆盘也闪一下
-  refuse(peg) {
-    this.shake(this.discEls[this.top(this.held)]);
+  // 大盘不能压小盘：手上的圆盘 disc 摇一下，目标柱上挡路的那个圆盘也闪一下
+  refuse(disc, peg) {
+    this.shake(this.discEls[disc]);
     this.pulse(this.discEls[this.top(peg)]);
     this.flash('大盘不能压在小盘上', true);
   }
@@ -302,7 +329,6 @@ class Hanoi {
     const previous = this.records[key];
     this.records[key] = this.ctx.submitRecord(key, time, { lowerIsBetter: true });
     this.record = previous === undefined ? 'first' : time < previous ? 'best' : null;
-    this.refs.board.classList.add('is-won');
     // 等最后一个圆盘落下，从上往下依次跳一下
     const stack = [...this.pegs[TARGET]].reverse();
     stack.forEach((disc, k) => this.bounce(this.discEls[disc], 380 + k * 70));
@@ -382,8 +408,9 @@ class Hanoi {
       if (over === null || over === from) this.putBack();
       else if (this.canMove(from, over)) this.commit(from, over, [this.stackPoint(disc, over, this.pegs[over].length)]);
       else {
-        this.refuse(over);
+        // 先起飞再摇：飞的时候会取消圆盘身上已有的动画
         this.putBack();
+        this.refuse(disc, over);
       }
     });
   }
@@ -499,10 +526,10 @@ class Hanoi {
     el.animate(frames, { duration: clamp(120 + total * 0.7, 150, 420), easing: 'cubic-bezier(0.3, 0.7, 0.4, 1)' });
   }
 
+  // 摇的是单独的 translate 属性，和 transform 上正在飞的动画叠在一起，一边飞回去一边摇
   shake(el) {
-    const base = el.style.transform;
     el.animate(
-      [0, -7, 6, -4, 2, 0].map((dx) => ({ transform: `${base} translateX(${dx}px)` })),
+      [0, -7, 6, -4, 2, 0].map((dx) => ({ translate: `${dx}px 0` })),
       { duration: 320, easing: 'ease-out' },
     );
   }
@@ -585,8 +612,10 @@ class Hanoi {
   }
 
   updateChrome() {
-    const { levels, moves, least, tools, undo, result, resultTitle, resultText, again } = this.refs;
+    const { levels, moves, least, board, tools, undo, result, resultTitle, resultText, again } = this.refs;
     const won = this.status === 'won';
+    // 赢了的棋盘带一圈绿光；放在这里，读档回来的已完成局面也有
+    board.classList.toggle('is-won', won);
     for (const button of levels.children) {
       button.classList.toggle('is-active', Number(button.dataset.level) === this.discs);
     }

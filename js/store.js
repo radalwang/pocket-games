@@ -21,6 +21,15 @@ function write(key, value) {
   }
 }
 
+function remove(key) {
+  try {
+    localStorage.removeItem(PREFIX + key);
+  } catch {
+    // localStorage 不可用，只需清内存
+  }
+  memory.delete(key);
+}
+
 export const changes = new EventTarget();
 const notify = () => changes.dispatchEvent(new Event('change'));
 
@@ -30,6 +39,12 @@ export const progress = {
 
   setSave(id, state, { summary = '', finished = false } = {}) {
     write(`save:${id}`, { state, summary, finished, at: Date.now() });
+    notify();
+  },
+
+  // 存档坏了读不出来时由外壳调用，成绩不受影响
+  clearSave(id) {
+    remove(`save:${id}`);
     notify();
   },
 

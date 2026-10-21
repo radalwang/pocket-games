@@ -8,6 +8,8 @@ const LEVELS = { easy: '初级', medium: '中级', hard: '高级' };
 const HINTS = 3;
 const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const MOVES = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] };
+// 放在格子本身上的动画（pop 在里面的数字上，不算）
+const CELL_ANIMATIONS = ['shake', 'flash', 'wave'];
 
 function clock(ms) {
   const seconds = Math.floor(ms / 1000);
@@ -68,7 +70,8 @@ const decode = (text) => [...text].map(Number);
 const isGrid = (text) => typeof text === 'string' && /^[0-9]{81}$/.test(text);
 
 const isValidSave = (saved) =>
-  Boolean(saved && LEVELS[saved.level] && isGrid(saved.puzzle) && isGrid(saved.solution) && isGrid(saved.values)
+  Boolean(saved && Object.hasOwn(LEVELS, saved.level)
+    && isGrid(saved.puzzle) && isGrid(saved.solution) && isGrid(saved.values)
     && Array.isArray(saved.notes) && saved.notes.length === 81);
 
 class Sudoku {
@@ -186,7 +189,8 @@ class Sudoku {
     this.values = decode(saved.values);
     this.notes = saved.notes.map((mask) => mask | 0);
     this.history = [];
-    this.selected = Number.isInteger(saved.selected) ? saved.selected : -1;
+    // 选中的格子不在棋盘上，就当没选
+    this.selected = Number.isInteger(saved.selected) && saved.selected >= 0 && saved.selected < 81 ? saved.selected : -1;
     this.notesMode = Boolean(saved.notesMode);
     this.mistakes = saved.mistakes || 0;
     this.hintsLeft = saved.hintsLeft ?? HINTS;
@@ -317,6 +321,11 @@ class Sudoku {
     this.hintsLeft--;
     this.selected = i;
     this.place(i, this.solution[i]);
+    // 提示填的数字不能撤销：去掉 place 刚记下的这一步，再从更早的记录里去掉这一格，免得撤销时把它擦掉
+    this.history.pop();
+    this.history = this.history
+      .map((step) => ({ ...step, cells: step.cells.filter(([j]) => j !== i) }))
+      .filter((step) => step.cells.length);
   }
 
   easiestCell() {
@@ -422,9 +431,11 @@ class Sudoku {
   // ---------- 画面 ----------
 
   // 播放一次性的动画：pop 数字弹出、shake 晃一下、flash 闪一下、wave 通关时的波浪
+  // 格子本身的动画同一时间只有一个生效，被盖住的收不到 animationend，类会一直留着，
+  // 等盖住它的放完又重播一遍（比如通关时的波浪盖住刚开始的闪烁），所以先把它们都去掉
   animate(i, name, delay = 0) {
     const el = this.cells[i];
-    el.classList.remove(name);
+    el.classList.remove(...(name === 'pop' ? [name] : CELL_ANIMATIONS));
     el.style.setProperty('--d', `${delay}ms`);
     void el.offsetWidth;
     el.classList.add(name);

@@ -4,12 +4,14 @@ import { categories } from '../registry.js';
 import { progress } from '../store.js';
 import { cover } from '../covers.js';
 import { icon } from '../icons.js';
-import { esc, fmt } from '../ui.js';
+import { esc } from '../ui.js';
+
+// 成绩那一行，比如「最高 2,048 分」；还没有成绩时为空
+export const recordText = (game) => game.formatRecord?.(progress.getRecords(game.id)) ?? '';
 
 export function subtitle(game) {
   if (game.status !== 'ready') return '即将推出';
-  const best = progress.getBest(game.id);
-  return best ? `最高 ${fmt(best)} 分` : categories[game.category];
+  return recordText(game) || categories[game.category];
 }
 
 // 方形封面 + 标题，用在横向栏和资料库网格里

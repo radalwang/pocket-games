@@ -5,7 +5,7 @@ import { progress } from './store.js';
 import { resetPlayer } from './player.js';
 import { setBehind, toast } from './ui.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 const sheet = document.getElementById('settings');
 const body = sheet.querySelector('.sheet-body');

@@ -5,6 +5,12 @@ export const esc = (text) => String(text).replace(/[&<>"']/g, (ch) => ESCAPES[ch
 
 export const fmt = (n) => Number(n).toLocaleString('zh-CN');
 
+// 毫秒 → 分:秒，比如 83400 → 1:23
+export function clock(ms) {
+  const seconds = Math.floor(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 // 重新渲染一块区域，同时保留里面横向滚动栏的位置
 export function patch(el, html) {
   const kept = new Map();

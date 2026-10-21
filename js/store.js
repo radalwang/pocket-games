@@ -1,4 +1,4 @@
-// 本地存储：存档、最高分、最近玩过。所有数据只保存在这台设备上。
+// 本地存储：存档、成绩、最近玩过。所有数据只保存在这台设备上。
 // 浏览器不让用 localStorage 时（比如无痕模式），退回到只在本次打开期间有效的内存存储。
 
 const PREFIX = 'pg:';
@@ -33,14 +33,23 @@ export const progress = {
     notify();
   },
 
-  getBest: (id) => read(`best:${id}`, 0),
+  // 成绩：{ 名称: 数值 }，比如 2048 的 { score }、扫雷每档的最快用时 { easy, medium, hard }
+  getRecords(id) {
+    const records = read(`records:${id}`, null);
+    if (records) return records;
+    // 0.1.0 版只存了一个最高分
+    const legacyBest = read(`best:${id}`, 0);
+    return legacyBest ? { score: legacyBest } : {};
+  },
 
-  // 记录分数，返回更新后的最高分
-  submitScore(id, score) {
-    const best = progress.getBest(id);
-    if (score <= best) return best;
-    write(`best:${id}`, score);
-    return score;
+  // 记录一项成绩，返回这一项更新后的最好成绩；lowerIsBetter 用于用时这类越小越好的成绩
+  submitRecord(id, key, value, { lowerIsBetter = false } = {}) {
+    const records = progress.getRecords(id);
+    const best = records[key];
+    const better = best === undefined || (lowerIsBetter ? value < best : value > best);
+    if (!better) return best;
+    write(`records:${id}`, { ...records, [key]: value });
+    return value;
   },
 
   getRecent: () => read('recent', []),
@@ -54,7 +63,7 @@ export const progress = {
     notify();
   },
 
-  // 清除存档、最高分和最近玩过，保留界面偏好
+  // 清除存档、成绩和最近玩过，保留界面偏好
   clearAll() {
     try {
       const keys = [];

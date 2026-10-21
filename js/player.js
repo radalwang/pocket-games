@@ -3,10 +3,13 @@
 //
 // 每个游戏模块导出 { mount(root, ctx) }，可以是异步的。ctx 提供：
 //   ctx.saved                 上次的存档（没有则为 null）
-//   ctx.best                  历史最高分
+//   ctx.records               历史最好成绩 { 名称: 数值 }，比如 { score: 2048 }
 //   ctx.save(state, info)     存档；info = { summary: 显示在继续条上的文字, finished: 这一局是否已结束 }
-//   ctx.submitScore(score)    记录分数，返回更新后的最高分
-// mount 返回的对象可以有 pause()、resume()、destroy()，分别在收起、展开、卸载时调用。
+//   ctx.submitRecord(key, value, { lowerIsBetter })
+//                             记录一项成绩，返回这一项更新后的最好成绩；用时这类越小越好的传 lowerIsBetter: true
+// 卡片上怎么显示成绩，由 registry.js 里这个游戏的 formatRecord 决定。
+// mount 返回的对象可以有 pause()、resume()、destroy()：
+// 收起游戏页或切到后台时调用 pause，回来时调用 resume，卸载时调用 destroy。
 
 import { getGame } from './registry.js';
 import { progress } from './store.js';
@@ -65,9 +68,9 @@ async function mountGame(game) {
   try {
     const instance = await module.default.mount(root, {
       saved: progress.getSave(game.id)?.state ?? null,
-      best: progress.getBest(game.id),
+      records: progress.getRecords(game.id),
       save: (state, info) => progress.setSave(game.id, state, info),
-      submitScore: (score) => progress.submitScore(game.id, score),
+      submitRecord: (key, value, options) => progress.submitRecord(game.id, key, value, options),
     });
     current = { game, instance: instance ?? {} };
   } catch (err) {
@@ -130,6 +133,13 @@ sheet.querySelector('[data-action="collapse"]').addEventListener('click', collap
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && open) collapse();
+});
+
+// 锁屏或切到别的 App 时也算暂停，比如扫雷的计时会停下
+document.addEventListener('visibilitychange', () => {
+  if (!open) return;
+  if (document.hidden) current?.instance.pause?.();
+  else current?.instance.resume?.();
 });
 
 // 按住顶部往下拖可以收起，拖得够远或甩得够快就收起，否则弹回

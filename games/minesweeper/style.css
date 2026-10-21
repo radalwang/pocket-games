@@ -1,0 +1,293 @@
+/* 扫雷的样式，只作用在 .ms 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.ms {
+  --ms-board: #e1e7e5;
+  --ms-hi: #86e7c7;
+  --ms-lo: #3ec3a6;
+  --ms-hi-2: #7cdfbf;
+  --ms-lo-2: #37ba9e;
+  --ms-open: #fbfbfc;
+  --ms-open-2: #f2f3f4;
+  --ms-seg-on: #fff;
+  --ms-mine: #1c1c1e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ms {
+    --ms-board: #1c1c1e;
+    --ms-hi: #3fb196;
+    --ms-lo: #23836f;
+    --ms-hi-2: #39a88e;
+    --ms-lo-2: #1f7a68;
+    --ms-open: #2c2c2e;
+    --ms-open-2: #29292b;
+    --ms-seg-on: #636366;
+    --ms-mine: #f2f2f7;
+  }
+}
+
+.ms [hidden] { display: none !important; }
+
+.ms > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* ---------- 分段选择（难度、翻开/插旗） ---------- */
+
+.ms-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.ms-seg button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.ms-seg button.is-active {
+  background: var(--ms-seg-on);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+.ms-seg svg { width: 16px; height: 16px; }
+
+/* ---------- 剩余雷数、用时、新游戏 ---------- */
+
+.ms-top {
+  display: flex;
+  gap: 10px;
+  height: 48px;
+}
+
+.ms-stat {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.ms-stat svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--label-2);
+}
+
+.ms-stat strong {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-new {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ms-new svg { width: 16px; height: 16px; }
+
+.ms-new:active,
+.ms-again:active,
+.ms-seg button:active { opacity: 0.7; }
+
+/* ---------- 棋盘：在剩下的空间里尽量大，格子保持方形 ---------- */
+
+.ms-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.ms-board {
+  --gap: 3px;
+  --cell: calc(min(100cqw, 100cqh * var(--cols) / var(--rows)) / var(--cols));
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+  gap: var(--gap);
+  width: min(100cqw, 100cqh * var(--cols) / var(--rows));
+  aspect-ratio: var(--cols) / var(--rows);
+  padding: 5px;
+  border-radius: 16px;
+  background: var(--ms-board);
+  transition: box-shadow 0.4s;
+}
+
+.ms-board.is-won {
+  box-shadow: 0 0 0 3px color-mix(in srgb, #34c759 55%, transparent), 0 10px 30px rgba(52, 199, 89, 0.25);
+}
+
+/* 没翻开的格子是凸起的薄荷色方块，翻开后变平 */
+.ms-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 24%;
+  font-size: calc(var(--cell) * 0.55);
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(165deg, var(--ms-hi), var(--ms-lo));
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1),
+    0 1px 1.5px rgba(0, 0, 0, 0.12);
+  transition: transform 0.12s ease;
+}
+
+.ms-cell.alt { background: linear-gradient(165deg, var(--ms-hi-2), var(--ms-lo-2)); }
+.ms-cell.is-down { transform: scale(0.88); }
+
+.ms-cell.is-open {
+  background: var(--ms-open);
+  box-shadow: none;
+}
+
+.ms-cell.is-open.alt { background: var(--ms-open-2); }
+
+.ms-cell svg {
+  width: 62%;
+  height: 62%;
+  pointer-events: none;
+}
+
+.ms-cell.is-flag { color: #fff; }
+.ms-cell.is-mine { color: var(--ms-mine); }
+
+/* 要压过上面 .is-open.alt 的棋盘格底色 */
+.ms-cell.is-open.is-exploded {
+  background: #ff453a;
+  color: #1c1c1e;
+}
+
+/* 插错的旗子打个叉 */
+.ms-cell.is-wrong::before,
+.ms-cell.is-wrong::after {
+  content: "";
+  position: absolute;
+  width: 74%;
+  height: 2.5px;
+  border-radius: 2px;
+  background: #ff3b30;
+  transform: rotate(45deg);
+}
+
+.ms-cell.is-wrong::after { transform: rotate(-45deg); }
+
+.ms .n1 { color: #0a7aff; }
+.ms .n2 { color: #248a3d; }
+.ms .n3 { color: #ff3b30; }
+.ms .n4 { color: #5856d6; }
+.ms .n5 { color: #c93400; }
+.ms .n6 { color: #0e8a9e; }
+.ms .n7 { color: #af52de; }
+.ms .n8 { color: #636366; }
+
+@media (prefers-color-scheme: dark) {
+  .ms .n1 { color: #409cff; }
+  .ms .n2 { color: #30d158; }
+  .ms .n3 { color: #ff6961; }
+  .ms .n4 { color: #7d7aff; }
+  .ms .n5 { color: #ff9f0a; }
+  .ms .n6 { color: #5ac8fa; }
+  .ms .n7 { color: #da8fff; }
+  .ms .n8 { color: #aeaeb2; }
+}
+
+.ms-cell.pop.is-open { animation: ms-open 0.26s cubic-bezier(0.2, 0.8, 0.3, 1.25) var(--d, 0ms) backwards; }
+.ms-cell.pop.is-flag svg { animation: ms-flag 0.3s cubic-bezier(0.2, 0.8, 0.3, 1.4) var(--d, 0ms) backwards; }
+.ms-cell.nudge { animation: ms-nudge 0.3s ease; }
+
+@keyframes ms-open {
+  from { opacity: 0; transform: scale(0.5); }
+}
+
+@keyframes ms-flag {
+  from { opacity: 0; transform: translateY(-40%) scale(0.4); }
+}
+
+@keyframes ms-nudge {
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+/* ---------- 底部：提示 / 翻开插旗切换 / 结果 ---------- */
+
+.ms-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+}
+
+.ms-hint {
+  font-size: 14px;
+  color: var(--label-2);
+}
+
+.ms-modes { width: 220px; }
+.ms-modes button { height: 36px; }
+
+.ms-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 44px;
+  padding: 0 5px 0 16px;
+  border-radius: 22px;
+  font-size: 15px;
+  font-weight: 600;
+  animation: ms-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.ms-result.is-won { background: color-mix(in srgb, #34c759 18%, transparent); }
+.ms-result.is-lost { background: color-mix(in srgb, #ff3b30 15%, transparent); }
+
+@keyframes ms-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.ms-again {
+  flex: none;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 17px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}

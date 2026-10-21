@@ -4,8 +4,8 @@ import { categories, games, getGame } from '../registry.js';
 import { progress } from '../store.js';
 import { cover } from '../covers.js';
 import { icon } from '../icons.js';
-import { esc, fmt, patch } from '../ui.js';
-import { tile } from './parts.js';
+import { esc, patch } from '../ui.js';
+import { recordText, tile } from './parts.js';
 
 export function renderHome(el) {
   const recent = progress.getRecent().map(getGame).filter(Boolean);
@@ -27,7 +27,7 @@ function heroCard(game) {
   const ready = game.status === 'ready';
   const save = ready ? progress.getSave(game.id) : null;
   const resuming = Boolean(save && !save.finished);
-  const best = progress.getBest(game.id);
+  const record = ready ? recordText(game) : '';
   const eyebrow = !ready ? '即将推出' : resuming ? '继续上次的进度' : '立即开玩';
   const action = ready
     ? `<span class="pill">${icon('play')}${resuming ? '继续' : '开始游戏'}</span>`
@@ -43,7 +43,7 @@ function heroCard(game) {
           <p class="hero-tagline">${esc(game.tagline)}</p>
           <div class="hero-actions">
             ${action}
-            ${best ? `<span class="hero-meta">最高 ${fmt(best)} 分</span>` : ''}
+            ${record ? `<span class="hero-meta">${esc(record)}</span>` : ''}
           </div>
         </div>
       </button>

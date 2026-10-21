@@ -47,7 +47,7 @@ const isValidSave = (saved) => Array.isArray(saved?.cells) && saved.cells.length
 class Game {
   constructor(root, ctx) {
     this.ctx = ctx;
-    this.best = ctx.best;
+    this.best = ctx.records.score ?? 0;
     this.tiles = new Map(); // id → { id, value, r, c, el }
     this.retiring = []; // 合并掉的方块，滑完动画后移除
     this.nextId = 1;
@@ -214,7 +214,7 @@ class Game {
     if (!moved) return;
 
     this.score += gained;
-    this.best = this.ctx.submitScore(this.score);
+    this.best = this.ctx.submitRecord('score', this.score);
     this.spawn();
     this.updateScores();
     this.timer = setTimeout(() => this.dropRetiring(), SLIDE_MS + 30);

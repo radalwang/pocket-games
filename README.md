@@ -2,7 +2,7 @@
 
 可以离线玩的 iPhone 小游戏合集。用网页技术（PWA）写成，在 Safari 里“添加到主屏幕”后会全屏运行，没有网络也能打开。界面参考 Apple Music。
 
-目前包括：2048（可以玩），数独、扫雷（即将推出）。
+目前包括：2048、扫雷（可以玩），数独（即将推出）。
 
 ## 本地预览
 
@@ -36,13 +36,14 @@ js/store.js             存档、最高分、最近玩过
 js/covers.js            用代码画的游戏封面
 js/views/               首页、资料库、搜索
 games/2048/             2048 的代码和样式
+games/minesweeper/      扫雷的代码和样式
 icons/                  主屏幕图标（由 tools/make_icons.py 生成）
 ```
 
 ## 加一个新游戏
 
 1. 新建 `games/<游戏名>/index.js`，导出 `mount(root, ctx)`。可以照着 `games/2048/index.js` 写，接口说明在 `js/player.js` 开头。
-2. 在 `js/registry.js` 的 `games` 里加一条，`status` 写 `'ready'`，`load` 指向上面的文件。
+2. 在 `js/registry.js` 的 `games` 里加一条，`status` 写 `'ready'`，`load` 指向上面的文件，`formatRecord` 决定卡片上怎么显示成绩。
 3. 想要新的封面图案，就在 `js/covers.js` 的 `MOTIFS` 里加一个函数。
 4. 把新文件的路径加进 `sw.js` 的 `ASSETS`，再改一下 `VERSION`。
 

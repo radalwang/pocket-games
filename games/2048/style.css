@@ -1,0 +1,225 @@
+/* 2048 的样式，只作用在 .g2048 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.g2048 {
+  --gap: 10px;
+  --board: #e3e3e9;
+  --cell: rgba(255, 255, 255, 0.6);
+  --w: max(260px, min(100%, 440px, 100dvh - 320px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  height: 100%;
+  padding: 4px 20px 6vh;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .g2048 {
+    --board: #1c1c1e;
+    --cell: #2c2c2e;
+  }
+}
+
+.g2048-top {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: var(--w);
+}
+
+.g2048-score {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.g2048-score span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.g2048-score strong {
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.g2048-new {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.g2048-new svg { width: 16px; height: 16px; }
+
+.g2048-new:active,
+.g2048-btn:active { opacity: 0.7; }
+
+.g2048-board {
+  position: relative;
+  width: var(--w);
+  aspect-ratio: 1;
+  padding: var(--gap);
+  border-radius: 18px;
+  background: var(--board);
+}
+
+.g2048-cells {
+  display: grid;
+  grid-template: repeat(4, 1fr) / repeat(4, 1fr);
+  gap: var(--gap);
+  height: 100%;
+}
+
+.g2048-cells > div {
+  border-radius: 11px;
+  background: var(--cell);
+}
+
+.g2048-tiles {
+  position: absolute;
+  inset: var(--gap);
+  container-type: inline-size;
+}
+
+/* 方块位置由 --r、--c 决定，改变它们时会滑过去 */
+.g2048-tile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: calc((100% - 3 * var(--gap)) / 4);
+  aspect-ratio: 1;
+  transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap))));
+  transition: transform 110ms ease-in-out;
+}
+
+.g2048-tile.is-merged { z-index: 2; }
+
+.g2048-face {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 11px;
+  color: #fff;
+  font-size: 11cqw;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.g2048-face.d3 { font-size: 9cqw; }
+.g2048-face.d4 { font-size: 7.2cqw; }
+.g2048-face.d5 { font-size: 5.8cqw; }
+
+.g2048-tile.is-new .g2048-face { animation: g2048-appear 0.18s ease 0.1s backwards; }
+.g2048-tile.is-merged .g2048-face { animation: g2048-pop 0.2s ease 0.1s backwards; }
+
+@keyframes g2048-appear {
+  from { opacity: 0; transform: scale(0.4); }
+}
+
+@keyframes g2048-pop {
+  0% { opacity: 0; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* 数字越大颜色越热，和封面同一套橙粉色系 */
+.g2048 .v2 { background: #fff; color: #48484a; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.g2048 .v4 { background: #ffe9d2; color: #8c4a16; }
+.g2048 .v8 { background: #ff9f0a; }
+.g2048 .v16 { background: #ff8a3d; }
+.g2048 .v32 { background: #ff6d3d; }
+.g2048 .v64 { background: #ff533c; }
+.g2048 .v128 { background: #ff4565; }
+.g2048 .v256 { background: #f5367f; }
+.g2048 .v512 { background: #de3597; }
+.g2048 .v1024 { background: #b93bb4; }
+.g2048 .v2048 { background: linear-gradient(135deg, #ff2d6f, #8e5cff); box-shadow: 0 0 18px rgba(255, 45, 111, 0.45); }
+.g2048 .vmax { background: linear-gradient(135deg, #5e5ce6, #bf5af2); }
+
+@media (prefers-color-scheme: dark) {
+  .g2048 .v2 { background: #3a3a3c; color: #f2f2f7; box-shadow: none; }
+  .g2048 .v4 { background: #4d3b2c; color: #ffd6a8; }
+}
+
+.g2048-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  border-radius: inherit;
+  text-align: center;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: g2048-fade 0.3s ease both;
+}
+
+.g2048-overlay[hidden] { display: none; }
+
+@keyframes g2048-fade {
+  from { opacity: 0; }
+}
+
+.g2048-overlay h3 {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.g2048-overlay p {
+  margin-bottom: 12px;
+  font-size: 15px;
+  color: var(--label-2);
+  text-wrap: balance;
+}
+
+.g2048-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.g2048-btn {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 22px;
+  background: var(--fill-2);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.g2048-btn.is-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.g2048-hint {
+  max-width: 300px;
+  text-align: center;
+  text-wrap: balance;
+  font-size: 13px;
+  color: var(--label-2);
+}

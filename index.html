@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="口袋游戏">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>口袋游戏</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <div id="app" class="app">
+    <main class="views">
+      <section class="view is-active" data-view="home" aria-label="首页">
+        <header class="nav"><span class="nav-title">首页</span></header>
+        <div class="view-body"></div>
+      </section>
+      <section class="view" data-view="library" aria-label="资料库">
+        <header class="nav"><span class="nav-title">资料库</span></header>
+        <div class="view-body"></div>
+      </section>
+      <section class="view" data-view="search" aria-label="搜索">
+        <header class="nav"><span class="nav-title">搜索</span></header>
+        <div class="view-body"></div>
+      </section>
+    </main>
+
+    <div class="dock">
+      <button id="mini" class="mini glass" data-open="" aria-label="继续游戏">
+        <span class="mini-art"></span>
+        <span class="mini-text">
+          <span class="mini-title"></span>
+          <span class="mini-sub"></span>
+        </span>
+        <span class="mini-play" data-icon="play"></span>
+      </button>
+      <div class="dock-row">
+        <nav class="tabbar glass" role="tablist" aria-label="标签栏">
+          <button class="tab is-active" role="tab" data-tab="home"><span data-icon="home"></span>首页</button>
+          <button class="tab" role="tab" data-tab="library"><span data-icon="library"></span>资料库</button>
+        </nav>
+        <button class="tab-search glass" role="tab" data-tab="search" aria-label="搜索"><span data-icon="search"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <section id="player" class="player" aria-label="游戏" inert>
+    <div class="player-bg"></div>
+    <header class="player-head">
+      <div class="grabber"></div>
+      <div class="player-bar">
+        <button class="icon-btn" data-action="collapse" aria-label="收起"><span data-icon="chevronDown"></span></button>
+        <div class="player-title"></div>
+        <span class="icon-btn-spacer"></span>
+      </div>
+    </header>
+    <div class="player-stage"></div>
+  </section>
+
+  <section id="settings" class="sheet" aria-label="设置" inert>
+    <header class="sheet-head">
+      <span></span>
+      <h2>设置</h2>
+      <button class="sheet-done" data-action="close-settings">完成</button>
+    </header>
+    <div class="sheet-body"></div>
+  </section>
+
+  <div id="toast" class="toast glass" role="status" aria-live="polite"></div>
+</body>
+</html>

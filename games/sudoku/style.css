@@ -1,0 +1,381 @@
+/* 数独的样式，只作用在 .sd 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.sd {
+  --sd-ink: #5856d6;
+  --sd-cell: #fff;
+  --sd-thin: #e3e3ea;
+  --sd-thick: #a5a5b2;
+  --sd-peer: #eef0fc;
+  --sd-same: #d5d9fa;
+  --sd-sel: #bac0f7;
+  --sd-wrong: #ff3b30;
+  --sd-wrong-bg: #ffe5e3;
+  --sd-seg-on: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sd {
+    --sd-ink: #8e8cff;
+    --sd-cell: #1c1c1e;
+    --sd-thin: #36363a;
+    --sd-thick: #707078;
+    --sd-peer: #232335;
+    --sd-same: #2f2f57;
+    --sd-sel: #43429a;
+    --sd-wrong: #ff6961;
+    --sd-wrong-bg: #45201e;
+    --sd-seg-on: #636366;
+  }
+}
+
+.sd [hidden] { display: none !important; }
+
+.sd > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* ---------- 难度 ---------- */
+
+.sd-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.sd-seg button {
+  flex: 1;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.sd-seg button.is-active {
+  background: var(--sd-seg-on);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* ---------- 错误次数、用时、新游戏 ---------- */
+
+.sd-top {
+  display: flex;
+  gap: 10px;
+  height: 48px;
+}
+
+.sd-stat {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.sd-stat span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.sd-stat strong {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-stat.has-mistakes strong { color: var(--sd-wrong); }
+
+.sd-new {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sd-new svg { width: 16px; height: 16px; }
+
+.sd-new:active,
+.sd-again:active,
+.sd-seg button:active,
+.sd-tools button:active { opacity: 0.7; }
+
+/* ---------- 棋盘：在剩下的空间里尽量大；粗线分宫，细线分格 ---------- */
+
+.sd-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.sd-board {
+  --size: min(100cqw, 100cqh);
+  display: grid;
+  grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  width: var(--size);
+  height: var(--size);
+  padding: 2px;
+  border-radius: 14px;
+  background: var(--sd-thick);
+  transition: box-shadow 0.4s;
+}
+
+.sd-board.is-won {
+  box-shadow: 0 0 0 3px color-mix(in srgb, #34c759 55%, transparent), 0 10px 30px rgba(52, 199, 89, 0.25);
+}
+
+.sd-box {
+  display: grid;
+  grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--sd-thin);
+}
+
+.sd-box:nth-child(1) { border-top-left-radius: 12px; }
+.sd-box:nth-child(3) { border-top-right-radius: 12px; }
+.sd-box:nth-child(7) { border-bottom-left-radius: 12px; }
+.sd-box:nth-child(9) { border-bottom-right-radius: 12px; }
+
+.sd-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  background: var(--sd-cell);
+  font-size: calc(var(--size) * 0.064);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sd-cell.is-given { font-weight: 700; }
+.sd-cell.is-user { color: var(--sd-ink); font-weight: 600; }
+.sd-cell.is-wrong { color: var(--sd-wrong); font-weight: 600; }
+
+/* 高亮的先后：选中 > 冲突 > 同数字 > 同行列宫 > 填错 */
+.sd-cell.is-wrong { background: var(--sd-wrong-bg); }
+.sd-cell.is-peer { background: var(--sd-peer); }
+.sd-cell.is-same { background: var(--sd-same); }
+.sd-cell.is-clash { background: var(--sd-wrong-bg); color: var(--sd-wrong); }
+.sd-cell.is-sel { background: var(--sd-sel); }
+
+.sd-digit { display: block; }
+
+/* 笔记：格子里 3×3 的小数字 */
+.sd-notes {
+  position: absolute;
+  inset: 5%;
+  display: grid;
+  grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr));
+  font-size: calc(var(--size) * 0.026);
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.sd-notes span {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.sd-notes span.is-hl {
+  background: var(--sd-ink);
+  color: #fff;
+}
+
+.sd-cell.pop .sd-digit { animation: sd-pop 0.28s cubic-bezier(0.2, 0.8, 0.3, 1.4) var(--d, 0ms) backwards; }
+.sd-cell.shake { animation: sd-shake 0.32s ease; }
+.sd-cell.flash { animation: sd-flash 0.6s ease var(--d, 0ms); }
+.sd-cell.wave { animation: sd-wave 0.7s ease var(--d, 0ms); }
+
+@keyframes sd-pop {
+  from { opacity: 0; transform: scale(0.4); }
+}
+
+@keyframes sd-shake {
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
+@keyframes sd-flash {
+  35% { background-color: var(--sd-same); }
+}
+
+@keyframes sd-wave {
+  35% {
+    background-color: color-mix(in srgb, #34c759 35%, var(--sd-cell));
+    transform: scale(0.9);
+  }
+}
+
+/* ---------- 工具栏和数字键 ---------- */
+
+.sd-bottom {
+  position: relative;
+}
+
+.sd-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 通关后保留这块地方，免得棋盘跳动 */
+.sd-bottom.is-over .sd-controls { visibility: hidden; }
+
+.sd-tools {
+  display: flex;
+  justify-content: space-around;
+}
+
+.sd-tools button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 64px;
+  padding: 2px 0;
+  color: var(--label-2);
+  font-size: 12px;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.sd-tools svg { width: 24px; height: 24px; }
+.sd-tools button.is-active { color: var(--sd-ink); }
+.sd-tools button:disabled { opacity: 0.35; cursor: default; }
+
+.sd-badge {
+  position: absolute;
+  top: -2px;
+  left: calc(50% + 7px);
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--label-3);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.sd-tools .is-active .sd-badge { background: var(--sd-ink); }
+
+.sd-pad {
+  display: flex;
+  gap: 4px;
+}
+
+.sd-pad button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 58px;
+  border-radius: 12px;
+  background: var(--fill);
+  color: var(--sd-ink);
+  transition: transform 0.1s, opacity 0.2s;
+}
+
+.sd-pad button:active {
+  background: var(--fill-2);
+  transform: scale(0.92);
+}
+
+.sd-pad b {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+  transition: font-size 0.15s;
+}
+
+.sd-pad small {
+  height: 13px;
+  margin-top: 3px;
+  color: var(--label-2);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 笔记模式下数字变小变淡，像铅笔字 */
+.sd-pad.is-notes b {
+  font-size: 21px;
+  color: var(--label-2);
+}
+
+.sd-pad button.is-done {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* ---------- 结果 ---------- */
+
+.sd-result {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 44px;
+  margin-top: -22px;
+  padding: 0 5px 0 16px;
+  border-radius: 22px;
+  background: color-mix(in srgb, #34c759 18%, transparent);
+  font-size: 15px;
+  font-weight: 600;
+  animation: sd-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes sd-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.sd-again {
+  flex: none;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 17px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}

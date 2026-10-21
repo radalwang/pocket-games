@@ -1,7 +1,7 @@
 // 离线缓存：第一次打开时把所有文件存到手机上，之后没有网络也能打开。
 // 发布新版本时改一下 VERSION，手机下次联网打开时会换成新文件。
 // 新增文件（比如新游戏）时，记得把路径加进 ASSETS。
-const VERSION = 'v0.3.0';
+const VERSION = 'v0.4.0';
 const CACHE = `pocket-games-${VERSION}`;
 const ASSETS = [
   './',
@@ -24,6 +24,24 @@ const ASSETS = [
   'games/2048/style.css',
   'games/minesweeper/index.js',
   'games/minesweeper/style.css',
+  'games/sudoku/index.js',
+  'games/sudoku/puzzle.js',
+  'games/sudoku/style.css',
+  'games/merge/index.js',
+  'games/merge/style.css',
+  'games/hanoi/index.js',
+  'games/hanoi/style.css',
+  'games/tetris/index.js',
+  'games/tetris/style.css',
+  'games/huarongdao/index.js',
+  'games/huarongdao/levels.js',
+  'games/huarongdao/rules.js',
+  'games/huarongdao/style.css',
+  'games/pixel-bird/index.js',
+  'games/pixel-bird/style.css',
+  'games/watersort/index.js',
+  'games/watersort/puzzle.js',
+  'games/watersort/style.css',
   'icons/icon-180.png',
   'icons/icon-192.png',
   'icons/icon-512.png',

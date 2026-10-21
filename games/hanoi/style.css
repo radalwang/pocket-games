@@ -1,0 +1,366 @@
+/* 汉诺塔的样式，只作用在 .hn 里面；--accent、--fill、--label 等颜色变量来自外壳。
+   圆盘的位置和大小由 index.js 按棋盘尺寸算好，柱子和底座的位置来自它设的 --peg-top、--base-top 等变量 */
+
+.hn {
+  --hn-board: #efebe6;
+  --hn-wood-hi: #e2d6c6;
+  --hn-wood-lo: #c4b29b;
+  --hn-seg-on: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hn {
+    --hn-board: #1c1c1e;
+    --hn-wood-hi: #5a5048;
+    --hn-wood-lo: #3d3530;
+    --hn-seg-on: #636366;
+  }
+}
+
+.hn [hidden] { display: none !important; }
+
+.hn > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* ---------- 层数选择 ---------- */
+
+.hn-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.hn-seg button {
+  flex: 1;
+  height: 30px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.hn-seg button.is-active {
+  background: var(--hn-seg-on);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* ---------- 步数、用时、新游戏 ---------- */
+
+.hn-top {
+  display: flex;
+  gap: 10px;
+  height: 52px;
+}
+
+.hn-stat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.hn-stat > span {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hn-stat strong {
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 步数后面跟着这一层的最少步数 */
+.hn-stat strong small {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.hn-new {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hn-new svg { width: 16px; height: 16px; }
+
+.hn-new:active,
+.hn-again:active,
+.hn-seg button:active,
+.hn-tools button:active:not(:disabled) { opacity: 0.7; }
+
+/* ---------- 棋盘：三根柱子平分宽度，高度跟着剩下的空间走 ---------- */
+
+.hn-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+
+.hn-board {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-height: 420px;
+  border-radius: 20px;
+  background: var(--hn-board);
+  cursor: pointer;
+  transition: box-shadow 0.4s;
+}
+
+.hn-board.is-won {
+  box-shadow: 0 0 0 3px color-mix(in srgb, #34c759 55%, transparent), 0 10px 30px rgba(52, 199, 89, 0.25);
+}
+
+.hn-peg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(100% / 3);
+}
+
+.hn-peg[data-peg="1"] { left: calc(100% / 3); }
+.hn-peg[data-peg="2"] { left: calc(200% / 3); }
+
+.hn-rod,
+.hn-base {
+  position: absolute;
+  background: linear-gradient(90deg, var(--hn-wood-hi), var(--hn-wood-lo));
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.hn-rod {
+  top: var(--peg-top, 30%);
+  left: 50%;
+  width: 8px;
+  height: calc(var(--base-top, 80%) - var(--peg-top, 30%) + 2px);
+  border-radius: 4px 4px 0 0;
+  transform: translateX(-50%);
+}
+
+.hn-base {
+  top: var(--base-top, 80%);
+  left: 6px;
+  right: 6px;
+  height: var(--base-h, 12px);
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--hn-wood-hi), var(--hn-wood-lo));
+}
+
+/* 终点：底座带一点强调色，下面写着「终点」 */
+.hn-peg.is-target .hn-base {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 45%, var(--hn-wood-hi)), color-mix(in srgb, var(--accent) 60%, var(--hn-wood-lo)));
+}
+
+.hn-goal {
+  position: absolute;
+  top: calc(var(--base-top, 80%) + var(--base-h, 12px) + 6px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* 拖动时手指下面的柱子亮起来：放得下是绿色，放不下是红色；提示用强调色。
+   外壳的强调色本身是粉红色，所以“放得下”不能用它，否则和“放不下”分不清。
+   拖到提示的柱子上时以拖动的颜色为准，所以提示写在前面 */
+.hn-peg.is-hint .hn-rod {
+  background: var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.hn-peg.is-over .hn-rod {
+  --hn-ok: #34c759;
+  background: var(--hn-ok);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--hn-ok) 60%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  .hn-peg.is-over .hn-rod { --hn-ok: #30d158; }
+}
+
+.hn-peg.is-over.is-bad .hn-rod {
+  background: var(--danger);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--danger) 60%, transparent);
+}
+
+.hn-peg.is-hint .hn-rod { animation: hn-glow 1s ease-in-out infinite alternate; }
+
+/* ---------- 圆盘：和 2048 的方块同一种画法，双色渐变加右上角一点光泽 ---------- */
+
+.hn-disc {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.4), transparent 60%),
+    linear-gradient(135deg, var(--a), var(--b));
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  will-change: transform;
+  transition: box-shadow 0.2s;
+}
+
+.hn-disc.is-held {
+  z-index: 3;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.12),
+    0 10px 20px rgba(0, 0, 0, 0.22);
+}
+
+.hn-disc.is-dragging { z-index: 4; }
+
+.hn-disc.is-hint {
+  outline: 3px solid color-mix(in srgb, var(--accent) 80%, #fff);
+  outline-offset: 2px;
+  animation: hn-hint 1s ease-in-out infinite alternate;
+}
+
+/* 从小到大：红、橙、黄、绿、青、靛、紫 */
+.hn .s1 { --a: #ff7a85; --b: #ff375f; }
+.hn .s2 { --a: #ffb057; --b: #ff7a1a; }
+.hn .s3 { --a: #ffdf5e; --b: #f5b400; }
+.hn .s4 { --a: #6fe28f; --b: #26b25a; }
+.hn .s5 { --a: #6dd5f7; --b: #1a9be0; }
+.hn .s6 { --a: #8a95ff; --b: #4f58d8; }
+.hn .s7 { --a: #cf8bff; --b: #9241e0; }
+
+@keyframes hn-hint {
+  from { outline-color: transparent; }
+}
+
+@keyframes hn-glow {
+  from { box-shadow: none; }
+}
+
+/* ---------- 底部：提示文字 / 撤销和提示 / 结果 ---------- */
+
+.hn-tip {
+  height: 18px;
+  margin: -2px 0 0;
+  overflow: hidden;
+  text-align: center;
+  font-size: 14px;
+  color: var(--label-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: color 0.2s;
+}
+
+.hn-tip.is-warn { color: var(--danger); }
+.hn-tip.is-gone { visibility: hidden; }
+
+.hn-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+}
+
+.hn-tools {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.hn-tools button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--fill);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hn-tools button:disabled { color: var(--label-3); cursor: default; }
+.hn-tools svg { width: 18px; height: 18px; }
+
+.hn-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 52px;
+  padding: 0 6px 0 16px;
+  border-radius: 26px;
+  background: color-mix(in srgb, #34c759 18%, transparent);
+  animation: hn-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.hn-result > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hn-result strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.hn-result small {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--label-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@keyframes hn-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.hn-again {
+  flex: none;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}

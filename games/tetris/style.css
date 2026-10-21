@@ -1,0 +1,296 @@
+/* 俄罗斯方块的样式，只作用在 .tet 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.tet {
+  --tet-board: #e3e3e9;
+  --tet-cell: rgba(255, 255, 255, 0.6);
+  --tet-btn: min(56px, 14.5vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tet {
+    --tet-board: #1c1c1e;
+    --tet-cell: #2c2c2e;
+  }
+}
+
+.tet [hidden] { display: none !important; }
+
+/* 分数栏和按钮跟棋盘加右侧栏一样宽，--tet-w 由 index.js 算好 */
+.tet-top,
+.tet-pad {
+  flex: none;
+  width: min(100%, var(--tet-w, 440px));
+}
+
+/* ---------- 分数、最高分、暂停 ---------- */
+
+.tet-top {
+  display: flex;
+  gap: 10px;
+  height: 48px;
+}
+
+.tet-stat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.tet-stat span,
+.tet-box span,
+.tet-info span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.tet-stat strong,
+.tet-info strong {
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tet-pause {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.tet-pause svg { width: 20px; height: 20px; }
+.tet-pause:disabled { opacity: 0.35; }
+
+.tet-pause:active,
+.tet-btn:active { opacity: 0.7; }
+
+/* ---------- 棋盘和右侧栏：尺寸由 index.js 按剩下的空间算 ---------- */
+
+.tet-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 0;
+}
+
+.tet-well {
+  position: relative;
+  flex: none;
+  padding: 5px;
+  border-radius: 16px;
+  background: var(--tet-board);
+}
+
+.tet-board { display: block; }
+
+.tet-well.is-bump { animation: tet-bump 0.16s ease-out; }
+
+@keyframes tet-bump {
+  35% { transform: translateY(3px); }
+}
+
+.tet-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tet-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px 10px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+button.tet-box:active { opacity: 0.7; }
+
+.tet-infos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.tet-info {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+/* ---------- 四消、T 旋、连击的提示字 ---------- */
+
+.tet-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  padding-top: 32%;
+  pointer-events: none;
+}
+
+.tet-flash-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: max-content;
+  text-align: center;
+  text-shadow: 0 1px 10px color-mix(in srgb, var(--bg) 85%, transparent);
+  animation: tet-flash 1.1s ease-out forwards;
+}
+
+.tet-flash-item span {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--label-2);
+}
+
+.tet-flash-item span:first-child {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--label);
+}
+
+@keyframes tet-flash {
+  0% { opacity: 0; transform: scale(0.7); }
+  14% { opacity: 1; transform: scale(1.08); }
+  26% { transform: scale(1); }
+  70% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-28px); }
+}
+
+/* ---------- 开始、暂停、结束画面 ---------- */
+
+.tet-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px;
+  border-radius: inherit;
+  text-align: center;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: tet-fade 0.3s ease both;
+}
+
+@keyframes tet-fade {
+  from { opacity: 0; }
+}
+
+.tet-overlay h3 {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.tet-overlay p {
+  margin-bottom: 12px;
+  font-size: 15px;
+  color: var(--label-2);
+  text-wrap: balance;
+}
+
+.tet-tips {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 7px 12px;
+  margin: 6px 0 14px;
+  font-size: 15px;
+  text-align: left;
+}
+
+.tet-tips dt { font-weight: 700; }
+
+.tet-tips dd {
+  margin: 0;
+  color: var(--label-2);
+}
+
+.tet-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.tet-btn {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 22px;
+  background: var(--fill-2);
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tet-btn.is-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---------- 底部按钮：左手移动和加速，右手落下和旋转 ---------- */
+
+.tet-pad {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tet-pad-gap { flex: 1; }
+
+.tet-pad button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--tet-btn);
+  height: var(--tet-btn);
+  border-radius: 50%;
+  background: var(--fill);
+  transition: transform 0.12s var(--ease), background-color 0.12s;
+}
+
+.tet-pad button svg { width: 24px; height: 24px; }
+
+.tet-pad button.is-down {
+  transform: scale(0.9);
+  background: var(--fill-2);
+}
+
+.tet-pad button.is-main {
+  width: calc(var(--tet-btn) + 6px);
+  height: calc(var(--tet-btn) + 6px);
+  background: var(--accent);
+  color: #fff;
+}
+
+.tet-pad button.is-main.is-down { background: color-mix(in srgb, var(--accent) 80%, #000); }

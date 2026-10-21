@@ -1,0 +1,300 @@
+/* 合数的样式，只作用在 .gmerge 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.gmerge {
+  --gap: 8px;
+  --board: #e3e3e9;
+  --cell: rgba(255, 255, 255, 0.6);
+  /* 棋盘宽度：竖向放得下分数栏、进度格、棋盘和提示就尽量宽，iPhone SE 上也和屏幕一样宽 */
+  --w: max(260px, min(100%, 440px, 100dvh - 310px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 100%;
+  padding: 4px 20px 6vh;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  .gmerge {
+    --board: #1c1c1e;
+    --cell: #2c2c2e;
+  }
+}
+
+.gmerge-top {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: var(--w);
+}
+
+.gmerge-score {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.gmerge-score span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.gmerge-score strong {
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.gmerge-score strong.is-long { font-size: 18px; }
+
+.gmerge-new {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.gmerge-new svg { width: 16px; height: 16px; }
+
+.gmerge-new:active,
+.gmerge-btn:active { opacity: 0.7; }
+
+/* 进度条：1 到 10 一排小方块，合出来过的点亮，10 用虚线框标成目标 */
+.gmerge-ladder {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 5px;
+  width: var(--w);
+}
+
+.gmerge-step {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--label-3);
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.gmerge-step.is-goal {
+  background: none;
+  outline: 2px dashed var(--label-3);
+  outline-offset: -2px;
+  color: var(--label-2);
+}
+
+.gmerge-step.is-reached {
+  color: #fff;
+  background:
+    radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.38), transparent 55%),
+    linear-gradient(135deg, var(--a), var(--b));
+}
+
+/* 新数字从棋盘上方落进来，超出棋盘的部分要挡住 */
+.gmerge-board {
+  position: relative;
+  width: var(--w);
+  aspect-ratio: 1;
+  padding: var(--gap);
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--board);
+}
+
+.gmerge-cells {
+  display: grid;
+  grid-template: repeat(5, 1fr) / repeat(5, 1fr);
+  gap: var(--gap);
+  height: 100%;
+}
+
+.gmerge-cells > div {
+  border-radius: 12px;
+  background: var(--cell);
+}
+
+.gmerge-tiles {
+  position: absolute;
+  inset: var(--gap);
+  container-type: inline-size;
+}
+
+/* 方块位置由 --r、--c 决定；--t、--tf 是滑过去的时长和缓动，由脚本按情况设置 */
+.gmerge-tile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: calc((100% - 4 * var(--gap)) / 5);
+  aspect-ratio: 1;
+  transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap))));
+  transition: transform var(--t, 130ms) var(--tf, ease-out);
+  cursor: pointer;
+}
+
+.gmerge-tile.is-merged { z-index: 2; }
+
+.gmerge-tile.is-gone {
+  z-index: 0;
+  pointer-events: none;
+}
+
+.gmerge-face {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.38), transparent 55%),
+    linear-gradient(135deg, var(--a), var(--b));
+  color: #fff;
+  font-size: 11cqw;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.14);
+  transition: opacity 0.15s ease, transform 0.13s ease-in;
+}
+
+.gmerge-face.d2 { font-size: 8.6cqw; }
+
+/* 选中的一组描白边、轻轻呼吸，其余的变淡 */
+.gmerge-tile.is-picked .gmerge-face {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.95), 0 6px 14px rgba(0, 0, 0, 0.22);
+  animation: gmerge-breathe 0.9s ease-in-out infinite alternate;
+}
+
+.gmerge-board.has-pick .gmerge-tile:not(.is-picked) .gmerge-face { opacity: 0.4; }
+
+.gmerge-tile.is-gone .gmerge-face {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.gmerge-tile.is-merged .gmerge-face { animation: gmerge-pop 0.26s ease; }
+.gmerge-tile.is-alone .gmerge-face { animation: gmerge-shake 0.3s ease; }
+
+@keyframes gmerge-breathe {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
+}
+
+@keyframes gmerge-pop {
+  0% { transform: scale(0.85); }
+  50% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+@keyframes gmerge-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5%); }
+  50% { transform: translateX(4%); }
+  75% { transform: translateX(-2%); }
+}
+
+/* 每个数字一种颜色，挨着的数字色相拉开，方便一眼找出相同的；10 是金色，10 以上转成深靛蓝 */
+.gmerge .v1 { --a: #7ad7ff; --b: #2fa6f2; }
+.gmerge .v2 { --a: #74e391; --b: #2dbd63; }
+.gmerge .v3 { --a: #ffe36e; --b: #ffbd2e; color: #8a5300; text-shadow: none; }
+.gmerge .v4 { --a: #ffae5e; --b: #ff7a2f; }
+.gmerge .v5 { --a: #ff7d7d; --b: #ff3b52; }
+.gmerge .v6 { --a: #ff7fbe; --b: #e43f97; }
+.gmerge .v7 { --a: #cc8cff; --b: #9450f2; }
+.gmerge .v8 { --a: #8d8aff; --b: #5553d8; }
+.gmerge .v9 { --a: #45d6c6; --b: #109c96; }
+.gmerge .v10 { --a: #ffd75e; --b: #ff9500; box-shadow: 0 0 16px rgba(255, 170, 0, 0.5); }
+.gmerge .v11 { --a: #5e5ce6; --b: #2b2c99; box-shadow: 0 0 16px rgba(94, 92, 230, 0.45); }
+.gmerge .v12 { --a: #4246d6; --b: #1b1d74; box-shadow: 0 0 16px rgba(66, 70, 214, 0.45); }
+.gmerge .vmax { --a: #2f2f8f; --b: #0e0f45; box-shadow: 0 0 16px rgba(66, 70, 214, 0.45); }
+
+/* 进度条上的小方块不需要发光 */
+.gmerge-step.is-reached { box-shadow: none; }
+
+/* 深色模式下 10 以上的深蓝会融进棋盘，调亮一些 */
+@media (prefers-color-scheme: dark) {
+  .gmerge .v12 { --a: #5c60f0; --b: #2b2f9e; }
+  .gmerge .vmax { --a: #6e72ff; --b: #2b2f9e; }
+}
+
+.gmerge-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  border-radius: inherit;
+  text-align: center;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: gmerge-fade 0.3s ease both;
+}
+
+.gmerge-overlay[hidden] { display: none; }
+
+@keyframes gmerge-fade {
+  from { opacity: 0; }
+}
+
+.gmerge-overlay h3 {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.gmerge-overlay p {
+  margin-bottom: 12px;
+  font-size: 15px;
+  color: var(--label-2);
+  text-wrap: balance;
+}
+
+.gmerge-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.gmerge-btn {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 22px;
+  background: var(--fill-2);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.gmerge-btn.is-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.gmerge-hint {
+  max-width: 300px;
+  min-height: 2.6em;
+  text-align: center;
+  text-wrap: balance;
+  font-size: 13px;
+  color: var(--label-2);
+}

@@ -1,0 +1,422 @@
+/* 华容道的样式，只作用在 .hrd 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.hrd {
+  --hrd-frame: #dccfb9;
+  --hrd-board: #f4eee4;
+  --hrd-done: #248a3d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hrd {
+    --hrd-frame: #3a3a3c;
+    --hrd-board: #1c1c1e;
+    --hrd-done: #30d158;
+  }
+}
+
+.hrd [hidden] { display: none !important; }
+
+.hrd > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* 四类棋子的颜色：曹操红、关羽绿、其他大将蓝、兵黄 */
+.hrd .k-cao { --hi: #ff7b6b; --lo: #e5352c; --ink: #fff; }
+.hrd .k-guan { --hi: #5cd67c; --lo: #1f9e57; --ink: #fff; }
+.hrd .k-general { --hi: #6ab6ff; --lo: #2f6fe0; --ink: #fff; }
+.hrd .k-bing { --hi: #ffd76e; --lo: #f3a51f; --ink: #7a4300; }
+
+@media (prefers-color-scheme: dark) {
+  .hrd .k-cao { --hi: #f2665a; --lo: #c42a22; }
+  .hrd .k-guan { --hi: #45c06a; --lo: #17834a; }
+  .hrd .k-general { --hi: #559ff0; --lo: #2459c2; }
+  .hrd .k-bing { --hi: #f5c552; --lo: #d98a12; --ink: #5c3200; }
+}
+
+/* ---------- 关卡、步数、最好成绩 ---------- */
+
+.hrd-top {
+  display: flex;
+  gap: 10px;
+  height: 52px;
+}
+
+.hrd-level {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 12px 0 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.hrd-level-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hrd-level-text small {
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.hrd-level-text strong {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hrd-level svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--label-2);
+  transition: transform 0.25s;
+}
+
+.hrd-level.is-open svg { transform: rotate(180deg); }
+
+.hrd-stat {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.hrd-stat span {
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.hrd-stat strong {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+/* ---------- 棋盘：在剩下的空间里尽量大，保持 4:5 ---------- */
+
+.hrd-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.hrd-frame {
+  --pad: 7px;
+  --bw: min(100cqw - 2 * var(--pad), (100cqh - 2 * var(--pad) - 24px) * 0.8);
+  --cell: calc(var(--bw) / 4);
+  position: relative;
+  margin-bottom: 24px;
+  padding: var(--pad);
+  border-radius: calc(var(--pad) + 14px);
+  background: var(--hrd-frame);
+}
+
+.hrd-board {
+  position: relative;
+  width: var(--bw);
+  height: calc(var(--bw) * 1.25);
+  border-radius: 14px;
+  background: var(--hrd-board);
+  transition: box-shadow 0.4s;
+}
+
+.hrd-board.is-won {
+  box-shadow: 0 0 0 3px color-mix(in srgb, #34c759 55%, transparent), 0 10px 30px rgba(52, 199, 89, 0.25);
+}
+
+.hrd-pieces {
+  position: absolute;
+  inset: 3px;
+}
+
+/* 出口：边框下沿中间开一个口子，下面写“出口” */
+.hrd-exit {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--pad) + var(--bw) * 0.25 + 3px);
+  width: calc(var(--bw) * 0.5 - 6px);
+  height: calc(var(--pad) + 2px);
+  background: var(--hrd-board);
+}
+
+.hrd-exit::after {
+  content: "出口";
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: var(--accent);
+}
+
+/* ---------- 棋子 ---------- */
+
+.hrd-piece {
+  position: absolute;
+  left: calc(var(--c) * 25%);
+  top: calc(var(--r) * 20%);
+  width: calc(var(--w) * 25%);
+  height: calc(var(--h) * 20%);
+  padding: 3px;
+  cursor: grab;
+}
+
+.hrd-piece.is-dragging {
+  z-index: 2;
+  cursor: grabbing;
+}
+
+.hrd-face {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  border-radius: calc(var(--cell) * 0.17);
+  background: linear-gradient(160deg, var(--hi), var(--lo));
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.13),
+    0 1.5px 3px rgba(0, 0, 0, 0.18);
+  color: var(--ink);
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", "PingFang SC", serif;
+  font-size: calc(var(--cell) * 0.32);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.2s;
+}
+
+.hrd-face span { margin-right: -0.12em; }
+.hrd .is-tall .hrd-face span { margin: 0 0 -0.12em; writing-mode: vertical-rl; }
+.hrd .k-cao .hrd-face { font-size: calc(var(--cell) * 0.44); }
+.hrd .k-bing .hrd-face { font-size: calc(var(--cell) * 0.38); text-shadow: none; }
+
+.hrd-piece.is-held .hrd-face { transform: scale(0.96); }
+
+.hrd-piece.is-dragging .hrd-face {
+  transform: scale(1.03);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.13),
+    0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+.hrd-piece.enter { animation: hrd-in 0.34s cubic-bezier(0.2, 0.8, 0.3, 1.25) var(--d, 0ms) backwards; }
+.hrd-piece.nudge .hrd-face { animation: hrd-nudge 0.3s ease; }
+.hrd-piece.is-hinted .hrd-face { animation: hrd-hint 0.9s ease; }
+
+/* 过关：曹操从出口滑出去 */
+.hrd-board.is-won .k-cao { animation: hrd-escape 0.7s cubic-bezier(0.5, 0, 0.75, 0) 0.3s forwards; }
+
+@keyframes hrd-in {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+@keyframes hrd-nudge {
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+@keyframes hrd-hint {
+  30% {
+    box-shadow:
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -3px 0 rgba(0, 0, 0, 0.13),
+      0 0 0 3px #fff,
+      0 0 18px 6px var(--hi);
+  }
+}
+
+@keyframes hrd-escape {
+  to { opacity: 0; transform: translateY(70%); }
+}
+
+.hrd-note {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 3;
+  margin: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--glass);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -6px);
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+}
+
+.hrd-note.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- 底部：撤销 / 重来 / 提示，过关后换成结果 ---------- */
+
+.hrd-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+}
+
+.hrd-tools {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.hrd-tools button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--fill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hrd-tools svg { width: 21px; height: 21px; }
+.hrd-tools button:disabled { opacity: 0.35; cursor: default; }
+
+.hrd-tools button:not(:disabled):active,
+.hrd-level:active,
+.hrd-card:active,
+.hrd-next:active { opacity: 0.7; }
+
+.hrd-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 48px;
+  padding: 0 6px 0 16px;
+  border-radius: 24px;
+  background: color-mix(in srgb, #34c759 18%, transparent);
+  font-size: 15px;
+  font-weight: 600;
+  animation: hrd-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes hrd-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.hrd-next {
+  flex: none;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ---------- 选关 ---------- */
+
+.hrd-picker {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+  padding-bottom: 6px;
+  touch-action: pan-y;
+  animation: hrd-rise 0.3s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.hrd-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px 10px 10px;
+  border-radius: 16px;
+  background: var(--fill);
+}
+
+.hrd-card.is-current { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.hrd-card svg {
+  flex: none;
+  width: 40px;
+  height: 50px;
+}
+
+.hrd-card .p-cao { fill: #e5352c; }
+.hrd-card .p-guan { fill: #1f9e57; }
+.hrd-card .p-general { fill: #2f6fe0; }
+.hrd-card .p-bing { fill: #f3a51f; }
+
+.hrd-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.hrd-card-text small {
+  font-size: 11px;
+  color: var(--label-2);
+}
+
+.hrd-card-text strong {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hrd-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.hrd-card-meta.is-done { color: var(--hrd-done); font-weight: 600; }
+.hrd-card-meta svg { width: 12px; height: 12px; }

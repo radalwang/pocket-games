@@ -1,0 +1,196 @@
+/* 像素小鸟的样式，只作用在 .pbird 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.pbird {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 4px 14px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+  cursor: pointer;
+}
+
+/* 画面的实际大小由 index.js 按比例算好写进 style */
+.pbird-screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #3fb5d6;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.pbird-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+.pbird-hud {
+  position: absolute;
+  inset: 10px 10px auto;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.pbird-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(20, 16, 30, 0.28);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  pointer-events: auto;
+}
+
+.pbird-icon svg { width: 20px; height: 20px; }
+.pbird-icon:active { opacity: 0.7; }
+.pbird-icon[hidden] { display: grid; visibility: hidden; }
+
+.pbird-hint {
+  position: absolute;
+  inset: 52% 0 auto;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+  text-shadow: 0 2px 0 rgba(59, 42, 51, 0.55), 0 0 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  animation: pbird-pulse 1.6s ease-in-out infinite;
+}
+
+.pbird-hint[hidden] { display: none; }
+
+.pbird-hint small {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.92;
+}
+
+@keyframes pbird-pulse {
+  50% { opacity: 0.65; }
+}
+
+.pbird-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(10, 8, 20, 0.2);
+  cursor: default;
+  animation: pbird-fade 0.25s ease both;
+}
+
+.pbird-overlay[hidden] { display: none; }
+
+@keyframes pbird-fade {
+  from { opacity: 0; }
+}
+
+.pbird-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, 290px);
+  padding: 22px 18px 18px;
+  border-radius: 22px;
+  text-align: center;
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.25);
+  animation: pbird-rise 0.4s var(--ease) both;
+}
+
+@keyframes pbird-rise {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+}
+
+.pbird-medal canvas {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 8px;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  animation: pbird-pop 0.5s var(--ease) 0.15s both;
+}
+
+@keyframes pbird-pop {
+  0% { opacity: 0; transform: scale(0.4) rotate(-20deg); }
+  60% { opacity: 1; transform: scale(1.12) rotate(4deg); }
+}
+
+.pbird-panel h3 {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.pbird-panel p {
+  margin-top: 4px;
+  font-size: 15px;
+  color: var(--label-2);
+  text-wrap: balance;
+}
+
+.pbird-stats {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.pbird-stat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.pbird-stat span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.pbird-stat strong {
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pbird-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pbird-btn {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 22px;
+  background: var(--fill-2);
+  font-size: 16px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.pbird-btn.is-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.pbird-btn:active { opacity: 0.7; }
+.pbird-btn:disabled { opacity: 0.45; cursor: default; }

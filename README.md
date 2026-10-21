@@ -2,7 +2,7 @@
 
 可以离线玩的 iPhone 小游戏合集。用网页技术（PWA）写成，在 Safari 里“添加到主屏幕”后会全屏运行，没有网络也能打开。界面参考 Apple Music。
 
-目前包括：2048、扫雷（可以玩），数独（即将推出）。
+目前包括：2048、扫雷、数独、合数、汉诺塔、俄罗斯方块、华容道、像素小鸟、倒水。
 
 ## 本地预览
 
@@ -37,6 +37,13 @@ js/covers.js            用代码画的游戏封面
 js/views/               首页、资料库、搜索
 games/2048/             2048 的代码和样式
 games/minesweeper/      扫雷的代码和样式
+games/sudoku/           数独：界面和样式，出题和求解在 puzzle.js
+games/merge/            合数：点击相连的相同数字合成，目标合到 10
+games/hanoi/            汉诺塔：3 到 7 层，点按或拖动圆盘，带撤销和最优解提示
+games/tetris/           俄罗斯方块：SRS 旋转、暂存、影子，棋盘上拖动轻点或用按钮操作
+games/huarongdao/       华容道：10 关（含横刀立马），拖动可拐弯，带撤销和最少步数提示；规则和求解在 rules.js，关卡在 levels.js
+games/pixel-bird/       像素小鸟：点屏幕扑翅膀穿过水管，像素画和音效都用代码生成，每 20 分换一次天色
+games/watersort/        倒水：三档难度随机出题，倾斜倒水动画画在 canvas 上，撤销限 5 次、可加一根空管；规则、出题和求解在 puzzle.js
 icons/                  主屏幕图标（由 tools/make_icons.py 生成）
 ```
 

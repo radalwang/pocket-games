@@ -81,5 +81,10 @@ if (here.searchParams.has('updated')) {
 }
 
 if ('serviceWorker' in navigator && window.isSecureContext) {
-  navigator.serviceWorker.register('sw.js').catch((err) => console.warn('离线缓存注册失败', err));
+  navigator.serviceWorker.register('sw.js').then((registration) => {
+    // 主屏幕上的 App 从后台切回来时不会重新加载页面，浏览器也就不会去查新版本，这里手动查一次（没网时查不到，忽略）
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') registration.update().catch(() => {});
+    });
+  }).catch((err) => console.warn('离线缓存注册失败', err));
 }

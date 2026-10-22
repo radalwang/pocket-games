@@ -914,6 +914,8 @@ svg { display: block; }
 
 .cell-value { color: var(--label-2); }
 .cell-danger { color: var(--danger); }
+.cell-action { color: var(--accent); }
+.cell-action:disabled { color: var(--label-2); }
 
 .group-note {
   margin: 7px 16px 0;
@@ -929,6 +931,8 @@ svg { display: block; }
   top: calc(var(--safe-top) + 56px);
   left: 50%;
   z-index: 60;
+  /* left: 50% 时浏览器只给它半个屏幕宽，不写 max-content 的话长一点的提示会提前折行 */
+  width: max-content;
   max-width: calc(100% - 48px);
   padding: 11px 18px;
   border-radius: 999px;

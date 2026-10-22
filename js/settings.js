@@ -5,7 +5,7 @@ import { progress } from './store.js';
 import { resetPlayer } from './player.js';
 import { setBehind, toast } from './ui.js';
 
-export const VERSION = '0.7.0';
+export const VERSION = '0.7.1';
 
 const sheet = document.getElementById('settings');
 const body = sheet.querySelector('.sheet-body');
@@ -25,6 +25,10 @@ function closeSettings() {
 
 function isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function canUpdate() {
+  return 'serviceWorker' in navigator && window.isSecureContext;
 }
 
 function offlineStatus() {
@@ -53,6 +57,7 @@ function render() {
     <p class="group-label">关于</p>
     <div class="group">
       <div class="cell"><span>版本</span><span class="cell-value">${VERSION}</span></div>
+      ${canUpdate() ? '<button class="cell cell-action" data-action="check-update"><span>检查更新</span><span class="cell-value"></span></button>' : ''}
       <div class="cell"><span>游戏</span><span class="cell-value">${games.length} 款 · ${playable} 款可以玩</span></div>
     </div>`;
 }
@@ -60,10 +65,47 @@ function render() {
 sheet.querySelector('[data-action="close-settings"]').addEventListener('click', closeSettings);
 
 body.addEventListener('click', (e) => {
-  if (!e.target.closest('[data-action="reset"]')) return;
+  const button = e.target.closest('[data-action]');
+  if (button?.dataset.action === 'reset') resetAll();
+  else if (button?.dataset.action === 'check-update') checkUpdate(button);
+});
+
+function resetAll() {
   if (!window.confirm('确定要清除所有存档和最高分吗？清除后无法恢复。')) return;
   resetPlayer();
   progress.clearAll();
   render();
   toast('已清除所有记录');
-});
+}
+
+// 手动查一次新版本。有新版就开始下载，下载完 sw.js 会把页面刷新成新版并提示“已更新”（见 sw.js 的 activate）
+async function checkUpdate(button) {
+  const status = button.querySelector('.cell-value');
+  const finish = (message) => {
+    button.disabled = false;
+    status.textContent = '';
+    toast(message);
+  };
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) {
+    toast('离线缓存还没准备好，稍后再试');
+    return;
+  }
+  button.disabled = true;
+  status.textContent = '正在检查…';
+  try {
+    await registration.update();
+  } catch {
+    finish('没有连上网络，稍后再试');
+    return;
+  }
+  const worker = registration.installing ?? registration.waiting;
+  if (!worker) {
+    finish('已是最新版本');
+    return;
+  }
+  status.textContent = '正在下载新版本…';
+  worker.addEventListener('statechange', () => {
+    if (worker.state === 'redundant') finish('新版本没下载完，稍后再试');
+  });
+}

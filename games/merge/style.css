@@ -14,6 +14,7 @@
   height: 100%;
   padding: 4px 20px 6vh;
   font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
 }
 
 @media (prefers-color-scheme: dark) {

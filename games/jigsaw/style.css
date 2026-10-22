@@ -47,6 +47,7 @@
 }
 
 .jg-seg button {
+  position: relative;
   flex: 1;
   height: 30px;
   border-radius: 8px;
@@ -54,6 +55,13 @@
   font-weight: 600;
   text-align: center;
   transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+/* 看起来 30px 高，能点的地方往上下多出一截凑够 44px：上面到游戏区顶，下面离进度那一排还有 6px，点偏了也不会点到别的按钮 */
+.jg-seg button::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0 -8px;
 }
 
 .jg-seg button.is-active {
@@ -93,6 +101,31 @@
   font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* 用时那一格：拼好过的话分成两行，下面一行小字是这个难度的最快用时 */
+.jg-timer {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+}
+
+.jg-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.jg-time strong { line-height: 1.15; }
+
+.jg-timer small {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .jg-new {
@@ -272,15 +305,15 @@
   top: -2px;
   left: calc(50% + 7px);
   min-width: 18px;
-  height: 16px;
+  height: 18px;
   padding: 0 4px;
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--jg-badge);
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 18px;
   text-align: center;
 }
 
@@ -335,10 +368,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 44px;
-  margin-top: -22px;
-  padding: 0 5px 0 16px;
-  border-radius: 22px;
+  height: 52px;
+  margin-top: -26px;
+  padding: 0 4px 0 16px;
+  border-radius: 26px;
   background: color-mix(in srgb, #34c759 18%, transparent);
   font-size: 15px;
   font-weight: 600;
@@ -351,9 +384,9 @@
 
 .jg-again {
   flex: none;
-  height: 34px;
+  height: 44px;
   padding: 0 16px;
-  border-radius: 17px;
+  border-radius: 22px;
   background: var(--accent);
   color: #fff;
   font-size: 15px;
@@ -389,6 +422,7 @@
 }
 
 .jg-picker-close {
+  position: relative;
   display: grid;
   place-items: center;
   width: 34px;
@@ -396,6 +430,13 @@
   border-radius: 50%;
   background: var(--fill);
   color: var(--label-2);
+}
+
+/* 看起来 34px，能点的地方四周各多出 5px 凑够 44px */
+.jg-picker-close::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
 }
 
 .jg-picker-close svg { width: 18px; height: 18px; }

@@ -287,7 +287,8 @@ class Sokoban {
   // ---------- 开局与存档 ----------
 
   start(levelId) {
-    this.stopWalking();
+    // 走到一半点了重来：这一关整个重开，没走完的路不用再走（走完可能先过关记了成绩）
+    this.cancelWalking();
     this.level = getLevel(levelId);
     this.map = parseLevel(this.level.map);
     this.player = this.map.player;
@@ -422,6 +423,15 @@ class Sokoban {
     if (this.queue.length) this.finishWalking();
   }
 
+  // 撤销、重来：这个动作反正要整个退回，剩下的几步直接丢掉。
+  // 不能先走完再退：最后一推正好过关的话，会先记下成绩、显示通关，再退回到没解完的棋盘
+  cancelWalking() {
+    clearTimeout(this.timer);
+    this.timer = 0;
+    this.queue = [];
+    this.refs.board.classList.remove('is-walking');
+  }
+
   applyStep(dir) {
     const next = step(this.map, this.player, this.boxes, dir);
     this.facing = dir;
@@ -483,7 +493,8 @@ class Sokoban {
 
   undo() {
     if (this.status !== 'playing') return;
-    this.finishWalking();
+    // 还在自动走路时，最后一个 mark 就是这段路的开头，下面会把已经走的几步一起退回
+    this.cancelWalking();
     const mark = this.marks.pop();
     if (mark === undefined) return;
     const undone = this.path.slice(mark);
@@ -527,6 +538,7 @@ class Sokoban {
     const previous = this.records[this.level.id];
     this.records[this.level.id] = this.ctx.submitRecord(this.level.id, moves, { lowerIsBetter: true });
     this.record = previous === undefined ? 'first' : moves < previous ? 'best' : null;
+    this.ctx.runEnded?.();
     this.refs.note.classList.remove('is-visible');
     this.boxEls.forEach((el, k) => el.style.setProperty('--i', k));
     this.refs.board.classList.add('is-won');

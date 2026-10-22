@@ -10,12 +10,15 @@
   --ms-open-2: #f2f3f4;
   --ms-seg-on: #fff;
   --ms-mine: #1c1c1e;
+  --ms-pole: #1c1c1e;
+  /* 高度是按 iPhone SE 算的：装到主屏幕后游戏区约 582px，两行控件连同上下空隙一共占 98px，
+     剩下 484px 正好让高级（16 行）的格子有 28px。上下留白要装得下按钮扩出去的点击范围 */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   height: 100%;
-  padding: 4px 20px 14px;
+  padding: 5px 16px 7px;
   font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
   touch-action: none;
 }
@@ -31,6 +34,7 @@
     --ms-open-2: #29292b;
     --ms-seg-on: #636366;
     --ms-mine: #f2f2f7;
+    --ms-pole: #fff;
   }
 }
 
@@ -52,6 +56,7 @@
 }
 
 .ms-seg button {
+  position: relative;
   display: inline-flex;
   flex: 1;
   align-items: center;
@@ -64,6 +69,16 @@
   transition: background-color 0.2s, box-shadow 0.2s;
 }
 
+/* 按钮看起来不高，用透明的伪元素把能点的范围上下扩到 44px；
+   旁边的空隙正好装得下，不会盖到别的控件和格子 */
+.ms-seg button::after,
+.ms-new::after,
+.ms-again::after {
+  content: "";
+  position: absolute;
+  inset: -7px 0;
+}
+
 .ms-seg button.is-active {
   background: var(--ms-seg-on);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
@@ -71,50 +86,34 @@
 
 .ms-seg svg { width: 16px; height: 16px; }
 
-/* ---------- 剩余雷数、用时、新游戏 ---------- */
+/* ---------- 上面一行：难度、新游戏 ---------- */
 
 .ms-top {
   display: flex;
-  gap: 10px;
-  height: 48px;
-}
-
-.ms-stat {
-  display: flex;
-  flex: 1;
-  align-items: center;
   gap: 8px;
-  padding: 0 14px;
-  border-radius: 14px;
-  background: var(--fill);
 }
 
-.ms-stat svg {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  color: var(--label-2);
-}
-
-.ms-stat strong {
-  font-size: 20px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+.ms-top .ms-seg {
+  flex: 1;
+  min-width: 0;
 }
 
 .ms-new {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   gap: 6px;
-  padding: 0 16px;
-  border-radius: 14px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
   background: var(--accent);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
 }
 
+.ms-new::after { inset: -5px 0; }
 .ms-new svg { width: 16px; height: 16px; }
 
 .ms-new:active,
@@ -131,17 +130,20 @@
   container-type: size;
 }
 
+/* 格子边长按宽、高两个方向分别算，取放得下的那个；外圈圆角跟着格子的圆角走 */
 .ms-board {
-  --gap: 3px;
-  --cell: calc(min(100cqw, 100cqh * var(--cols) / var(--rows)) / var(--cols));
+  --gap: 2px;
+  --pad: 3px;
+  --cell: min(
+    (100cqw - 2 * var(--pad) - (var(--cols) - 1) * var(--gap)) / var(--cols),
+    (100cqh - 2 * var(--pad) - (var(--rows) - 1) * var(--gap)) / var(--rows)
+  );
   display: grid;
-  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--cols), var(--cell));
+  grid-template-rows: repeat(var(--rows), var(--cell));
   gap: var(--gap);
-  width: min(100cqw, 100cqh * var(--cols) / var(--rows));
-  aspect-ratio: var(--cols) / var(--rows);
-  padding: 5px;
-  border-radius: 16px;
+  padding: var(--pad);
+  border-radius: calc(var(--cell) * 0.24 + var(--pad));
   background: var(--ms-board);
   transition: box-shadow 0.4s;
 }
@@ -183,7 +185,8 @@
   pointer-events: none;
 }
 
-.ms-cell.is-flag { color: #fff; }
+/* 旗杆和底座：浅色模式用深色才压得住薄荷绿，深色模式还是白色 */
+.ms-cell.is-flag { color: var(--ms-pole); }
 .ms-cell.is-mine { color: var(--ms-mine); }
 
 /* 要压过上面 .is-open.alt 的棋盘格底色 */
@@ -243,22 +246,83 @@
   75% { transform: translateX(2px); }
 }
 
-/* ---------- 底部：提示 / 翻开插旗切换 / 结果 ---------- */
+/* ---------- 下面一行：剩余雷数、提示或翻开插旗切换、用时；结束后换成结果条 ---------- */
 
 .ms-bottom {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 44px;
+  height: 40px;
 }
 
-.ms-hint {
-  font-size: 14px;
+.ms-play {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.ms-stat {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: var(--fill);
+}
+
+.ms-stat svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
   color: var(--label-2);
 }
 
-.ms-modes { width: 220px; }
+.ms-stat strong {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 用时那一格：通关过的话分成两行，下面一行小字是这个难度的最快用时 */
+.ms-timer {
+  flex-direction: column;
+  gap: 0;
+}
+
+.ms-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ms-time strong { line-height: 1.15; }
+
+.ms-timer small {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 中间这格：开局前是提示，玩的时候是切换；两边的数字放不下时先让它变窄 */
+.ms-hint,
+.ms-modes {
+  flex: 0 1 140px;
+  min-width: 0;
+}
+
+.ms-hint {
+  align-self: center;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--label-2);
+}
+
 .ms-modes button { height: 36px; }
+.ms-modes button::after { inset: -4px 0; }
 
 .ms-result {
   display: flex;
@@ -266,9 +330,9 @@
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  height: 44px;
-  padding: 0 5px 0 16px;
-  border-radius: 22px;
+  height: 40px;
+  padding: 0 4px 0 16px;
+  border-radius: 20px;
   font-size: 15px;
   font-weight: 600;
   animation: ms-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
@@ -282,12 +346,15 @@
 }
 
 .ms-again {
+  position: relative;
   flex: none;
-  height: 34px;
+  height: 32px;
   padding: 0 16px;
-  border-radius: 17px;
+  border-radius: 16px;
   background: var(--accent);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
 }
+
+.ms-again::after { inset: -6px 0; }

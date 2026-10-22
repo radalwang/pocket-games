@@ -629,6 +629,8 @@ class Tetris {
     this.save();
     this.showOver();
     this.render();
+    // 告诉外壳这一局结束了，破了纪录的话外壳会弹出「新纪录！」
+    this.ctx.runEnded?.();
   }
 
   // ---------- 游戏循环 ----------
@@ -641,6 +643,8 @@ class Tetris {
   }
 
   newGame() {
+    // 新开一局时告诉外壳：落块和暂停时都会报分，上一局中途破了纪录又放弃的话，不清掉会让这一局结束时误报「新纪录！」
+    this.ctx.runStarted?.();
     this.reset();
     this.start();
     this.save();

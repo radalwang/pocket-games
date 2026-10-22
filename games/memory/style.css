@@ -42,6 +42,7 @@
 }
 
 .mem-seg button {
+  position: relative;
   flex: 1;
   height: 30px;
   border-radius: 8px;
@@ -49,6 +50,13 @@
   font-weight: 600;
   text-align: center;
   transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+/* 看起来 30px 高，能点的范围上下伸出去凑够 44px：往上到游戏区顶边，往下离统计栏还留 6px */
+.mem-seg button::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0 -8px;
 }
 
 .mem-seg button.is-active {
@@ -265,7 +273,7 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 8px 8px 8px 16px;
+  padding: 6px 6px 6px 16px;
   border-radius: 16px;
   background: var(--fill);
   animation: mem-fade 0.3s ease both;
@@ -289,11 +297,12 @@
   color: var(--label-2);
 }
 
+/* 44px 高，成绩条连内边距正好 56px，和底部的高度一样，出成绩时方格不会被挤小 */
 .mem-again {
   flex: none;
-  height: 40px;
+  height: 44px;
   padding: 0 16px;
-  border-radius: 20px;
+  border-radius: 22px;
   background: var(--accent);
   color: #fff;
   font-size: 15px;

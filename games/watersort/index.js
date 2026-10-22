@@ -270,7 +270,7 @@ const TEMPLATE = `
     </div>
     <div class="ws-top">
       <div class="ws-stat"><span>步数</span><strong data-ref="moves">0</strong></div>
-      <div class="ws-stat"><span>用时</span><strong data-ref="time">0:00</strong></div>
+      <div class="ws-stat ws-timer"><div class="ws-time"><span>用时</span><strong data-ref="time">0:00</strong></div><small data-ref="best"></small></div>
       <button class="ws-new" data-ref="newGame">${RESTART}新游戏</button>
     </div>
     <div class="ws-stage" data-ref="stage">
@@ -402,13 +402,21 @@ class WaterSort {
 
   chooseLevel(level) {
     if (level === this.level && this.status === 'playing') return;
-    if (this.started && !window.confirm('换难度会放弃这一局，确定吗？')) return;
+    if (this.started && !this.confirmPaused('换难度会放弃这一局，确定吗？')) return;
     this.newGame(level);
   }
 
   requestNewGame() {
-    if (this.started && !window.confirm('重新开始会放弃这一局，确定吗？')) return;
+    if (this.started && !this.confirmPaused('重新开始会放弃这一局，确定吗？')) return;
     this.newGame();
+  }
+
+  // 先停表再弹确认框，点取消接着计时，看对话框的这几秒不算进用时
+  confirmPaused(message) {
+    this.stopClock();
+    const ok = window.confirm(message);
+    if (!ok && this.active) this.startClock();
+    return ok;
   }
 
   newGame(level = this.level) {
@@ -424,9 +432,10 @@ class WaterSort {
 
   // 重来：回到这一题的开头，撤销次数和空管也还给你，用时接着算
   restart() {
-    if (!this.started || !window.confirm('回到这一题的开头重新倒，确定吗？')) return;
+    if (!this.started || !this.confirmPaused('回到这一题的开头重新倒，确定吗？')) return;
     this.reset();
     this.save();
+    if (this.active) this.startClock();
   }
 
   reset() {
@@ -583,6 +592,7 @@ class WaterSort {
     const previous = this.records[this.level];
     this.records[this.level] = this.ctx.submitRecord(this.level, time, { lowerIsBetter: true });
     this.record = previous === undefined ? 'first' : time < previous ? 'best' : null;
+    this.ctx.runEnded?.();
     // 等最后一管水倒完再庆祝
     this.pendingWin = true;
   }
@@ -719,10 +729,14 @@ class WaterSort {
   }
 
   updateChrome() {
-    const { levels, undo, undoBadge, tube, tubeBadge, restart, bottom, result, resultText, note } = this.refs;
+    const { levels, best, undo, undoBadge, tube, tubeBadge, restart, bottom, result, resultText, note } = this.refs;
     const playing = this.status === 'playing';
     const over = !playing && !this.pendingWin;
     for (const button of levels.children) button.classList.toggle('is-active', button.dataset.level === this.level);
+    // 用时下面写着这个难度的最快用时，还没通关过就不写
+    const fastest = this.records[this.level];
+    best.hidden = !fastest;
+    best.textContent = fastest ? `最快 ${clock(fastest)}` : '';
 
     this.refs.moves.textContent = this.moves;
     this.renderTime();

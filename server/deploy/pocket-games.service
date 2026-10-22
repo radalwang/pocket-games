@@ -1,0 +1,57 @@
+# 口袋游戏联机服务器的 systemd 服务，装法见 DEPLOY.md。
+#
+# 约定（和 DEPLOY.md、update.sh 一致）：
+#   代码在 /srv/pocket-games（git clone 下来的整个仓库），归 pocketgames 用户所有
+#   服务器用 pocketgames 用户跑，不用 root
+#   端口 8787，只给本机的 Caddy 转发用，云服务器防火墙不要开这个端口
+#
+# 装好后：sudo cp 到 /etc/systemd/system/，再 sudo systemctl enable --now pocket-games
+
+[Unit]
+Description=口袋游戏联机服务器
+Documentation=https://github.com/radalwang/pocket-games/blob/main/server/deploy/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pocketgames
+Group=pocketgames
+WorkingDirectory=/srv/pocket-games/server
+ExecStart=/usr/bin/node server.js
+Environment=PORT=8787
+# 只听本机，外面只能经 Caddy 进来
+Environment=HOST=127.0.0.1
+Environment=NODE_ENV=production
+# 全网榜单的数据放在 /var/lib/pocket-games（systemd 自动建好、只给这个服务写）
+StateDirectory=pocket-games
+Environment=DATA_DIR=/var/lib/pocket-games
+Restart=always
+RestartSec=2
+SyslogIdentifier=pocket-games
+
+# 加固：服务器只读文件、只连网络，别的权限都收掉。
+# 没有用 MemoryDenyWriteExecute（Node 的 JIT 要用又能写又能执行的内存，开了会起不来），
+# 也没有用 SystemCallFilter（各版本 Node 用到的系统调用不一样，挡错了进程会直接被杀）。
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectProc=invisible
+ProtectHostname=true
+ProtectClock=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -17,6 +17,8 @@ const TRAY_PIECE = 76;
 const FINGER_LIFT = 30;
 // 离正确位置多近就吸住（以格子短边为 1）
 const SNAP = 0.3;
+// 选图页下面平时写的那行小字
+const PICKER_NOTE = '照片只保存在这台设备上';
 
 function clock(ms) {
   const seconds = Math.floor(ms / 1000);
@@ -38,7 +40,7 @@ const TEMPLATE = `
     </div>
     <div class="jg-top">
       <div class="jg-stat"><span>已拼</span><strong data-ref="count">0/0</strong></div>
-      <div class="jg-stat"><span>用时</span><strong data-ref="time">0:00</strong></div>
+      <div class="jg-stat jg-timer"><div class="jg-time"><span>用时</span><strong data-ref="time">0:00</strong></div><small data-ref="best"></small></div>
       <button class="jg-new" data-ref="change">${SWAP}换图</button>
     </div>
     <div class="jg-stage" data-ref="stage">
@@ -105,6 +107,7 @@ class Jigsaw {
     this.ctx = ctx;
     this.records = { ...ctx.records };
     this.active = false;
+    this.destroyed = false;
     this.runningSince = 0;
     this.ticker = 0;
     this.drag = null;
@@ -177,8 +180,17 @@ class Jigsaw {
 
   chooseLevel(level) {
     if (level === this.level && this.status === 'playing') return;
-    if (this.started && !window.confirm('换难度会放弃这一局，确定吗？')) return;
+    if (!this.confirmAbandon('换难度会放弃这一局，确定吗？')) return;
     this.newGame({ level });
+  }
+
+  // 已经动过了就先停表再弹确认框，点取消接着计时，犹豫的这几秒不算进用时
+  confirmAbandon(message) {
+    if (!this.started) return true;
+    this.stopClock();
+    const ok = window.confirm(message);
+    if (!ok && this.active) this.startClock();
+    return ok;
   }
 
   // 用户的照片 this.photo 换图时也一直留着，选图页里随时能再选「我的照片」
@@ -254,6 +266,8 @@ class Jigsaw {
   }
 
   save() {
+    // 换了别的游戏以后不再存档，免得盖掉存档里的进度
+    if (this.destroyed) return;
     const state = {
       level: this.level,
       picture: this.picture,
@@ -574,12 +588,19 @@ class Jigsaw {
     const previous = this.records[this.level];
     this.records[this.level] = this.ctx.submitRecord(this.level, time, { lowerIsBetter: true });
     this.record = previous === undefined ? 'first' : time < previous ? 'best' : null;
+    this.ctx.runEnded?.();
   }
 
   // ---------- 换图 ----------
 
+  // 选图页开着的时候（包括从这里打开的系统相册）不计时，翻图的工夫不算进用时
   openPicker() {
     this.endDrag();
+    if (this.runningSince) {
+      this.stopClock();
+      this.renderTime();
+      this.save();
+    }
     const { grid, picker, pickerNote } = this.refs;
     this.thumbs ??= Object.fromEntries(PICTURES.map((p) => [p.id, renderPicture(p.id, 180)]));
     const tile = (pick, art, name) => {
@@ -604,14 +625,16 @@ class Jigsaw {
     const album = tile('album', document.createRange().createContextualFragment(ADD_PHOTO), '从相册选');
     album.classList.add('is-album');
     grid.replaceChildren(...tiles, album);
-    pickerNote.textContent = '照片只保存在这台设备上';
+    pickerNote.textContent = PICKER_NOTE;
     picker.hidden = false;
   }
 
+  // 关掉选图页：没换图就接着计时
   closePicker() {
     // 还在读的照片作废，读完也不再换图
     this.photoTicket++;
     this.refs.picker.hidden = true;
+    if (this.active) this.startClock();
   }
 
   async readPhoto() {
@@ -629,7 +652,7 @@ class Jigsaw {
       if (ticket === this.photoTicket) pickerNote.textContent = '这张照片读不出来，换一张试试';
       return;
     }
-    // 读的这段时间里关掉了选图页，或是又选了别的图
+    // 读的这段时间里关掉了选图页、又选了别的图，或是收起了游戏页、换了别的游戏
     if (ticket !== this.photoTicket) return;
     if (this.choosePicture('photo', photo)) return;
     // 没放弃这一局：照片留着以后选。正在拼的就是之前那张照片时只能先留着旧的
@@ -642,7 +665,7 @@ class Jigsaw {
 
   // 换图；photo 是刚从相册读出来的照片。返回是不是真的换了
   choosePicture(picture, photo) {
-    if (this.started && !window.confirm('换图会放弃这一局，确定吗？')) return false;
+    if (!this.confirmAbandon('换图会放弃这一局，确定吗？')) return false;
     if (photo) this.photo = photo;
     this.closePicker();
     this.newGame({ picture });
@@ -656,7 +679,7 @@ class Jigsaw {
   }
 
   startClock() {
-    if (this.runningSince || this.status !== 'playing') return;
+    if (this.runningSince || this.status !== 'playing' || !this.refs.picker.hidden) return;
     this.runningSince = performance.now();
     this.ticker = setInterval(() => this.renderTime(), 250);
   }
@@ -683,9 +706,13 @@ class Jigsaw {
   }
 
   updateChrome() {
-    const { levels, count, ghostBadge, edgesTool, edgesBadge, gather, trayRow, trayEmpty, bottom, result, resultText } = this.refs;
+    const { levels, best, count, ghostBadge, edgesTool, edgesBadge, gather, trayRow, trayEmpty, bottom, result, resultText } = this.refs;
     const playing = this.status === 'playing';
     for (const button of levels.children) button.classList.toggle('is-active', button.dataset.level === this.level);
+    // 用时下面写着这个难度的最快用时，还没拼好过就不写
+    const fastest = this.records[this.level];
+    best.hidden = !fastest;
+    best.textContent = fastest ? `最快 ${clock(fastest)}` : '';
     const placed = this.pieces.filter((p) => p.at === 'placed').length;
     count.textContent = `${placed}/${this.pieces.length}`;
     this.renderTime();
@@ -719,6 +746,9 @@ class Jigsaw {
     this.active = false;
     this.endDrag();
     this.listen(false);
+    // 还没读完的照片作废：读完以后不会在首页上弹确认框，回来时在选图页重新选
+    this.photoTicket++;
+    this.refs.pickerNote.textContent = PICKER_NOTE;
     if (!this.runningSince) return;
     this.stopClock();
     this.renderTime();
@@ -733,6 +763,10 @@ class Jigsaw {
 
   destroy() {
     this.active = false;
+    // 还在读的照片、还在准备的新局都作废，之后也不再存档
+    this.destroyed = true;
+    this.photoTicket++;
+    this.token++;
     this.endDrag();
     this.listen(false);
     this.stopClock();

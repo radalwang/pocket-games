@@ -29,6 +29,10 @@
         <header class="nav"><span class="nav-title">资料库</span></header>
         <div class="view-body"></div>
       </section>
+      <section class="view" data-view="leaderboard" aria-label="榜单">
+        <header class="nav"><span class="nav-title">榜单</span></header>
+        <div class="view-body lb"></div>
+      </section>
       <section class="view" data-view="search" aria-label="搜索">
         <header class="nav"><span class="nav-title">搜索</span></header>
         <div class="view-body"></div>
@@ -48,6 +52,7 @@
         <nav class="tabbar glass" role="tablist" aria-label="标签栏">
           <button class="tab is-active" role="tab" data-tab="home"><span data-icon="home"></span>首页</button>
           <button class="tab" role="tab" data-tab="library"><span data-icon="library"></span>资料库</button>
+          <button class="tab" role="tab" data-tab="leaderboard"><span data-icon="trophy"></span>榜单</button>
         </nav>
         <button class="tab-search glass" role="tab" data-tab="search" aria-label="搜索"><span data-icon="search"></span></button>
       </div>
@@ -65,6 +70,10 @@
       </div>
     </header>
     <div class="player-stage"></div>
+    <button class="cheer" hidden>
+      <span class="cheer-icon" data-icon="trophy"></span>
+      <span class="cheer-text"><strong class="cheer-title"></strong><span class="cheer-detail"></span></span>
+    </button>
     <div class="guide" hidden>
       <div class="guide-card" role="dialog" aria-modal="true" aria-label="玩法介绍">
         <div class="guide-pages"></div>

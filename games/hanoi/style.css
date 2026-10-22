@@ -43,6 +43,7 @@
 }
 
 .hn-seg button {
+  position: relative;
   flex: 1;
   height: 30px;
   border-radius: 8px;
@@ -50,6 +51,13 @@
   font-size: 14px;
   font-weight: 600;
   transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+/* 看起来 30px 高，能点的地方往上下多出一截凑够 44px：上面到游戏区顶，下面离步数那一排还有 6px，点偏了也不会点到别的按钮 */
+.hn-seg button::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0 -8px;
 }
 
 .hn-seg button.is-active {
@@ -90,6 +98,21 @@
   line-height: 1.2;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* “用时”右边跟着这一层的最快用时 */
+.hn-stat > .hn-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.hn-label small {
+  overflow: hidden;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
 }
 
 /* 步数后面跟着这一层的最少步数 */
@@ -325,7 +348,7 @@
   gap: 12px;
   width: 100%;
   height: 52px;
-  padding: 0 6px 0 16px;
+  padding: 0 4px 0 16px;
   border-radius: 26px;
   background: color-mix(in srgb, #34c759 18%, transparent);
   animation: hn-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
@@ -356,9 +379,9 @@
 
 .hn-again {
   flex: none;
-  height: 40px;
+  height: 44px;
   padding: 0 16px;
-  border-radius: 20px;
+  border-radius: 22px;
   background: var(--accent);
   color: #fff;
   font-size: 15px;

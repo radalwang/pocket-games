@@ -1,25 +1,35 @@
 // 本地存储：存档、成绩、最近玩过。所有数据只保存在这台设备上。
-// 浏览器不让用 localStorage 时（比如无痕模式），退回到只在本次打开期间有效的内存存储。
+// 浏览器不让用 localStorage 时（比如无痕模式），或者存储空间满了写不进去时，退回到只在本次打开期间有效的内存存储。
 
 const PREFIX = 'pg:';
-const memory = new Map();
+const memory = new Map(); // 没能写进 localStorage 的最新值
 
 function read(key, fallback) {
+  // 写失败过的键以内存里那份为准，不然会读回 localStorage 里更旧的那份
+  if (memory.has(key)) return memory.get(key);
   try {
     const raw = localStorage.getItem(PREFIX + key);
     return raw === null ? fallback : JSON.parse(raw);
   } catch {
-    return memory.has(key) ? memory.get(key) : fallback;
+    return fallback;
   }
 }
 
 function write(key, value) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value));
-  } catch {
+    memory.delete(key);
+  } catch (err) {
     memory.set(key, value);
+    // 空间满了（多半是拼图存了大照片）：告诉外壳提示一下，一次打开只提示一次
+    if (err?.name === 'QuotaExceededError' && !warnedFull) {
+      warnedFull = true;
+      changes.dispatchEvent(new Event('full'));
+    }
   }
 }
+
+let warnedFull = false;
 
 function remove(key) {
   try {

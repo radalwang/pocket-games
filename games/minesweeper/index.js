@@ -25,22 +25,25 @@ const TAP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 const CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
 const RESTART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 3.8v3.9h3.9"/></svg>';
 
+// 控件只排两行，把高度尽量留给棋盘：上面是难度和新游戏，下面是剩余雷数、翻开/插旗、用时
 const TEMPLATE = `
   <div class="ms">
-    <div class="ms-seg" data-ref="levels">
-      ${Object.entries(LEVELS).map(([key, { name }]) => `<button data-level="${key}">${name}</button>`).join('')}
-    </div>
     <div class="ms-top">
-      <div class="ms-stat" aria-label="剩余地雷">${MINE}<strong data-ref="left">0</strong></div>
-      <div class="ms-stat" aria-label="用时">${CLOCK}<strong data-ref="time">0:00</strong></div>
+      <div class="ms-seg" data-ref="levels">
+        ${Object.entries(LEVELS).map(([key, { name }]) => `<button data-level="${key}">${name}</button>`).join('')}
+      </div>
       <button class="ms-new" data-ref="newGame">${RESTART}新游戏</button>
     </div>
     <div class="ms-stage"><div class="ms-board" data-ref="board"></div></div>
     <div class="ms-bottom">
-      <p class="ms-hint" data-ref="hint">点任意一格开始，长按可以插旗</p>
-      <div class="ms-seg ms-modes" data-ref="modes">
-        <button data-mode="dig">${TAP}翻开</button>
-        <button data-mode="flag">${FLAG}插旗</button>
+      <div class="ms-play" data-ref="play">
+        <div class="ms-stat" aria-label="剩余地雷">${MINE}<strong data-ref="left">0</strong></div>
+        <p class="ms-hint" data-ref="hint">点任意一格开始<br>长按可以插旗</p>
+        <div class="ms-seg ms-modes" data-ref="modes">
+          <button data-mode="dig">${TAP}翻开</button>
+          <button data-mode="flag">${FLAG}插旗</button>
+        </div>
+        <div class="ms-stat ms-timer" aria-label="用时"><div class="ms-time">${CLOCK}<strong data-ref="time">0:00</strong></div><small data-ref="best"></small></div>
       </div>
       <div class="ms-result" data-ref="result">
         <span data-ref="resultText"></span>
@@ -105,13 +108,23 @@ class Minesweeper {
 
   chooseLevel(level) {
     if (level === this.level && !this.over) return;
-    if (this.status === 'playing' && !window.confirm('换难度会放弃这一局，确定吗？')) return;
+    if (!this.confirmAbandon('换难度会放弃这一局，确定吗？')) return;
     this.newGame(level);
   }
 
   requestNewGame() {
-    if (this.status === 'playing' && !window.confirm('重新开始会放弃这一局，确定吗？')) return;
+    if (!this.confirmAbandon('重新开始会放弃这一局，确定吗？')) return;
     this.newGame();
+  }
+
+  // 正在玩时先停表再弹确认框，点取消接着计时，犹豫的这几秒不算进用时
+  confirmAbandon(message) {
+    if (this.status !== 'playing') return true;
+    const wasRunning = Boolean(this.runningSince);
+    this.stopClock();
+    const ok = window.confirm(message);
+    if (!ok && wasRunning) this.startClock();
+    return ok;
   }
 
   newGame(level = this.level) {
@@ -312,6 +325,8 @@ class Minesweeper {
       this.flags.add(m);
       this.paint(m, { pop: true, delay: Math.min(k * 40, 600) });
     });
+    // 告诉外壳这一局结束了，破了纪录的话外壳会弹出「新纪录！」；踩到雷不算成绩，不用告诉
+    this.ctx.runEnded?.();
   }
 
   // ---------- 操作 ----------
@@ -486,12 +501,18 @@ class Minesweeper {
   }
 
   updateChrome() {
-    const { levels, modes, hint, result, resultText, left, board } = this.refs;
+    const { levels, modes, hint, play, result, resultText, left, best, board } = this.refs;
     for (const button of levels.children) button.classList.toggle('is-active', button.dataset.level === this.level);
     for (const button of modes.children) button.classList.toggle('is-active', button.dataset.mode === this.mode);
     left.textContent = this.minesLeft();
     this.renderTime();
+    // 用时下面写着这个难度的最快用时，还没通关过就不写
+    const fastest = this.records[this.level];
+    best.hidden = !fastest;
+    best.textContent = fastest ? `最快 ${clock(fastest)}` : '';
 
+    // 结束后下面一整行换成结果条
+    play.hidden = this.over;
     hint.hidden = this.status !== 'ready';
     modes.hidden = this.status !== 'playing';
     result.hidden = !this.over;

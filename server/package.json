@@ -1,0 +1,16 @@
+{
+  "name": "pocket-games-server",
+  "private": true,
+  "description": "口袋游戏的联机服务器：快速匹配、房间码、大富翁和飞行棋的对局裁判",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}

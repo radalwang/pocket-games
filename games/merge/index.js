@@ -99,6 +99,8 @@ class Game {
   }
 
   newGame() {
+    // 新开一局时告诉外壳：分数是边玩边报的，上一局中途破了纪录又放弃的话，不清掉会让这一局结束时误报「新纪录！」
+    this.ctx.runStarted?.();
     let cells;
     do {
       cells = Array.from({ length: SIZE * SIZE }, () => randomValue(4));
@@ -280,6 +282,8 @@ class Game {
     if (!hasPair(this.values())) this.over = true;
     this.updateScores();
     this.save();
+    // 一局结束时告诉外壳，破了纪录的话外壳会弹出「新纪录！」
+    if (this.over) this.ctx.runEnded?.();
 
     this.schedule(GATHER_MS, () => {
       for (const tile of eaten) tile.el.remove();
@@ -411,7 +415,14 @@ class Game {
 
   showWin() {
     this.showOverlay(`合到 ${GOAL} 了！`, `现在 ${fmt(this.score)} 分，可以继续往上合`, [
-      { label: '新游戏', onClick: () => this.newGame() },
+      // 赢了不再接着合，这一局就到此结束；接着合的话等没有能合的了再算结束
+      {
+        label: '新游戏',
+        onClick: () => {
+          this.ctx.runEnded?.();
+          this.newGame();
+        },
+      },
       {
         label: '继续挑战',
         primary: true,
@@ -507,7 +518,7 @@ const PICKED_THREES = { '1,0': 'pick', '1,1': 'pick', '2,1': 'pick', rest: 'dim'
 
 const GUIDE = [
   {
-    title: '合到 10',
+    title: '合到10',
     text: '相连的相同数字能合成更大的数，合到 10 就赢了，还可以接着往上合。',
     art: guideArt(
       guideTile(30, 60, 50, 9) +

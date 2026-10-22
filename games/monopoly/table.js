@@ -1,15 +1,15 @@
-// 牌桌：规则（engine.js）和“谁在操作”之间的一层，为以后联机留好位置。
+// 牌桌：规则（engine.js）和“谁在操作”之间的一层，本机对局和联机对局共用。
 //
-// 不管是本机玩家点了按钮、电脑想好了，还是将来联机对手发来的，都是同一种动作 { type, by }，一律经 submit 交给 transport。
+// 不管是本机玩家点了按钮、电脑想好了，还是联机对手发来的，都是同一种动作 { type, by }，一律经 submit 交给 transport。
 // transport 决定动作怎么生效：
-//   · LocalTransport（现在用的）：马上原样送回来执行，同一台手机上轮流玩、和电脑玩都走这条路
-//   · 联机的 transport（以后写）：先发给服务器，服务器排好先后再广播给所有人，各自收到后再执行
+//   · LocalTransport：马上原样送回来执行，同一台手机上轮流玩、和电脑玩都走这条路
+//   · OnlineTransport：先发给服务器，服务器掷好骰子、排好先后再广播给所有人（包括自己），各自收到后再执行
 // 大家从同一个种子出发、按同样的顺序执行同样的动作，就会得到同样的局面。接口约定和联机的做法见 ONLINE.md。
 //
 // 每个座位在这台设备上由谁操作（controller）：
 //   local  这台设备上的真人，界面上给他按钮
-//   ai     电脑，由这台设备替他出手（联机时只有主机替电脑出手）
-//   remote 别的设备上的人（或者主机上的电脑），这里只等他的动作传过来
+//   ai     电脑，由这台设备替他出手（只在本机对局里；联机时电脑由服务器出手）
+//   remote 别的设备上的人（或者服务器上的电脑），这里只等他的动作传过来
 
 import { act, canAct, hashState, newGame, RULES_VERSION } from './engine.js';
 
@@ -24,6 +24,27 @@ export class LocalTransport {
 
   close() {
     this.deliver = null;
+  }
+}
+
+// 联机：只把“想做什么”发给服务器（server/PROTOCOL.md 的 act），座位由服务器按连接认定，骰子也由服务器掷。
+// 服务器确认的动作带着 rev 和骰子广播回来，由界面按顺序（等上一个动画播完）交给 deliver 执行
+export class OnlineTransport {
+  constructor(connection) {
+    this.connection = connection;
+  }
+
+  connect(deliver) {
+    this.deliver = deliver;
+  }
+
+  send(action) {
+    this.connection?.send({ t: 'act', action: { type: action.type } });
+  }
+
+  close() {
+    this.deliver = null;
+    this.connection = null;
   }
 }
 

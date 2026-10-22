@@ -22,6 +22,18 @@ python3 -m http.server 8080
 
 只是想在手机上看看界面的话，Mac 和 iPhone 连同一个 Wi‑Fi，在手机上访问 `http://<Mac 的局域网 IP>:8080` 就行。这种方式没有离线缓存。
 
+## 联机
+
+大富翁和飞行棋可以联机：快速匹配（凑满 4 人马上开始，30 秒凑不齐由电脑补位），或者开房间把 4 位房间号发给朋友。联机需要一台服务器，代码在 `server/`：
+
+```bash
+cd server
+npm install
+npm start
+```
+
+服务器在 8787 端口，它自己也会把游戏当网页发出来。游戏页面开在本机或局域网地址上时，会自动连这台电脑上的服务器。想自己和自己对战，就一个窗口开 http://localhost:8080 、另一个开 http://localhost:8787 （地址不同，两边的存档和昵称互不影响）。正式上线前要在 `js/online.js` 的 `PRODUCTION_SERVER` 填上服务器的 wss 地址。消息格式和服务器怎么当裁判见 `server/PROTOCOL.md`。
+
 ## 目录
 
 ```
@@ -33,8 +45,11 @@ js/app.js               入口：标签页切换、点击分发
 js/registry.js          游戏清单
 js/player.js            全屏游戏页、继续游戏条，以及游戏模块的接口说明
 js/store.js             存档、最高分、最近玩过
+js/online.js            联机：连服务器、昵称
+js/lobby.js             联机大厅：快速匹配、房间码（大富翁和飞行棋共用）
 js/covers.js            用代码画的游戏封面
 js/views/               首页、资料库、搜索
+js/views/leaderboard.js 榜单页：选游戏和榜，看全网前 100 名，自己的名次固定在底部
 games/2048/             2048 的代码和样式
 games/minesweeper/      扫雷的代码和样式
 games/sudoku/           数独：界面和样式，出题和求解在 puzzle.js
@@ -49,9 +64,10 @@ games/sokoban/          推箱子：12 关新做的关卡，划动走一步、�
 games/jigsaw/           拼图：12 / 24 / 48 块，从托盘拖到画板上吸住；6 张代码画的插画或相册照片；切块在 pieces.js，插画在 pictures.js
 games/memory/           记忆方格：几个格子亮一下再熄灭，凭记忆点出来；全对多记一格、点错退一级，一局 12 回合，另有方格会转 90° 的旋转模式；玩法介绍在 guide.js
 games/raindrops/        雨滴算术：雨滴里是加减乘除，落进水里前输入答案；答案相同的一起消，漏三滴结束，金色雨滴清屏；出题和难度在 rules.js
-games/monopoly/         大富翁：2～4 人本机轮流或和电脑玩，买地盖房收过路费；规则引擎可重放、按动作同步，为联机留好了口子，接法见 ONLINE.md
-games/feixingqi/        飞行棋：经典规则，和 1～3 个电脑玩，4 架或 2 架快速局；规则在 rules.js（可重放），对局和联机接口在 match.js，接法见 ONLINE.md
+games/monopoly/         大富翁：2～4 人本机轮流、和电脑玩或者联机对战，买地盖房收过路费；规则引擎可重放，联机由服务器裁判，见 ONLINE.md
+games/feixingqi/        飞行棋：经典规则，和 1～3 个电脑玩或者联机对战，4 架或 2 架快速局；规则在 rules.js（可重放），对局和联机在 match.js，见 ONLINE.md
 icons/                  主屏幕图标（由 tools/make_icons.py 生成）
+server/                 联机服务器（Node.js）：匹配、房间、对局裁判，用的是游戏自己的规则文件
 ```
 
 ## 加一个新游戏

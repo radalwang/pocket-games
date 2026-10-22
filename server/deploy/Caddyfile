@@ -1,0 +1,14 @@
+# 口袋游戏的 Caddy 配置，装法见 DEPLOY.md。
+#
+# 把下面的 game.example.com 换成你自己的域名，然后：
+#   sudo cp /srv/pocket-games/server/deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Caddy 会自己申请和续期 https 证书（要求域名已经解析到这台服务器、80 和 443 端口开着）。
+# 所有请求都转给本机 8787 端口的联机服务器：/online 是联机用的 WebSocket，
+# reverse_proxy 会原样转过去，不用额外设置；别的路径是游戏网页本身。
+
+game.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8787
+}

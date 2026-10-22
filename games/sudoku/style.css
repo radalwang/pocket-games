@@ -12,12 +12,15 @@
   --sd-wrong-bg: #ffe5e3;
   --sd-seg-on: #fff;
   --sd-badge: #6e6e73;
+  --sd-badge-on: #5856d6;
+  /* 间距是按 iPhone SE 算的：装到主屏幕后游戏区约 582px，控件和空隙一共占 215px，
+     棋盘能铺满 343px 的宽度。上面留白要装得下难度按钮扩出去的点击范围 */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   height: 100%;
-  padding: 4px 20px 14px;
+  padding: 5px 16px 8px;
   font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
   touch-action: none;
 }
@@ -35,6 +38,8 @@
     --sd-wrong-bg: #45201e;
     --sd-seg-on: #636366;
     --sd-badge: var(--label-3);
+    /* 白字放在 --sd-ink 的浅紫上看不清，开着的角标换深一点的紫 */
+    --sd-badge-on: #5e5ce6;
   }
 }
 
@@ -56,6 +61,7 @@
 }
 
 .sd-seg button {
+  position: relative;
   flex: 1;
   height: 30px;
   border-radius: 8px;
@@ -63,6 +69,15 @@
   font-weight: 600;
   text-align: center;
   transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+/* 按钮看起来只有 30px 高，用透明的伪元素把能点的范围上下扩到 44px；
+   上下的空隙正好装得下，不会盖到旁边的控件 */
+.sd-seg button::after,
+.sd-again::after {
+  content: "";
+  position: absolute;
+  inset: -7px 0;
 }
 
 .sd-seg button.is-active {
@@ -75,7 +90,7 @@
 .sd-top {
   display: flex;
   gap: 10px;
-  height: 48px;
+  height: 44px;
 }
 
 .sd-stat {
@@ -98,6 +113,31 @@
   font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* 用时那一格：通关过的话分成两行，下面一行小字是这个难度的最快用时 */
+.sd-timer {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+}
+
+.sd-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sd-time strong { line-height: 1.15; }
+
+.sd-timer small {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .sd-stat.has-mistakes strong { color: var(--sd-wrong); }
@@ -134,6 +174,8 @@
 
 .sd-board {
   --size: min(100cqw, 100cqh);
+  /* 一格的边长：棋盘减去外边 2×2、宫之间 2×2、宫里格子之间 3×2 */
+  --cell: calc((var(--size) - 14px) / 9);
   display: grid;
   grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr));
   gap: 2px;
@@ -189,13 +231,13 @@
 
 .sd-digit { display: block; }
 
-/* 笔记：格子里 3×3 的小数字 */
+/* 笔记：格子里 3×3 的小数字，字号差不多占满每个小格，装到主屏幕的 SE 上约 11.7px */
 .sd-notes {
   position: absolute;
-  inset: 5%;
+  inset: 3%;
   display: grid;
   grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr));
-  font-size: calc(var(--size) * 0.026);
+  font-size: calc(var(--cell) * 0.32);
   font-weight: 600;
   color: var(--label-2);
 }
@@ -247,7 +289,7 @@
 .sd-controls {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 /* 通关后保留这块地方，免得棋盘跳动 */
@@ -263,9 +305,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   width: 64px;
-  padding: 2px 0;
+  height: 44px;
   color: var(--label-2);
   font-size: 12px;
   font-weight: 600;
@@ -274,30 +317,32 @@
 
 .sd-tools svg { width: 24px; height: 24px; }
 .sd-tools button.is-active { color: var(--sd-ink); }
-.sd-tools button:disabled { opacity: 0.35; cursor: default; }
+/* 不能点时图标和字变淡，角标不变，「还剩 0 次」也看得清 */
+.sd-tools button:disabled { cursor: default; }
+.sd-tools button:disabled > :not(.sd-badge) { opacity: 0.35; }
 
 .sd-badge {
   position: absolute;
-  top: -2px;
+  top: -4px;
   left: calc(50% + 7px);
-  min-width: 18px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
   background: var(--sd-badge);
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 18px;
   text-align: center;
 }
 
-.sd-tools .is-active .sd-badge { background: var(--sd-ink); }
+.sd-tools .is-active .sd-badge { background: var(--sd-badge-on); }
 
 .sd-pad {
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 
 .sd-pad button {
@@ -307,7 +352,7 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
-  height: 58px;
+  height: 50px;
   border-radius: 12px;
   background: var(--fill);
   color: var(--sd-ink);
@@ -372,6 +417,7 @@
 }
 
 .sd-again {
+  position: relative;
   flex: none;
   height: 34px;
   padding: 0 16px;
@@ -381,3 +427,5 @@
   font-size: 15px;
   font-weight: 600;
 }
+
+.sd-again::after { inset: -5px 0; }

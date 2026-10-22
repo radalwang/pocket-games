@@ -40,7 +40,7 @@ const TEMPLATE = `
     </div>
     <div class="hn-top">
       <div class="hn-stat"><span>步数</span><strong><span data-ref="moves">0</span><small data-ref="least"></small></strong></div>
-      <div class="hn-stat"><span>用时</span><strong data-ref="time">0:00</strong></div>
+      <div class="hn-stat"><span class="hn-label">用时<small data-ref="best"></small></span><strong data-ref="time">0:00</strong></div>
       <button class="hn-new" data-ref="newGame">${RESTART}新游戏</button>
     </div>
     <div class="hn-stage">
@@ -142,14 +142,23 @@ class Hanoi {
 
   chooseLevel(n) {
     if (this.drag || (n === this.discs && this.status !== 'won')) return;
-    if (this.playing && !window.confirm('换层数会放弃这一局，确定吗？')) return;
+    if (!this.confirmAbandon('换层数会放弃这一局，确定吗？')) return;
     this.newGame(n);
   }
 
   requestNewGame() {
     if (this.drag) return;
-    if (this.playing && !window.confirm('重新开始会放弃这一局，确定吗？')) return;
+    if (!this.confirmAbandon('重新开始会放弃这一局，确定吗？')) return;
     this.newGame();
+  }
+
+  // 正在玩时先停表再弹确认框，点取消接着计时，犹豫的这几秒不算进用时
+  confirmAbandon(message) {
+    if (!this.playing) return true;
+    this.stopClock();
+    const ok = window.confirm(message);
+    if (!ok) this.startClock();
+    return ok;
   }
 
   newGame(n = this.discs) {
@@ -332,6 +341,8 @@ class Hanoi {
     // 等最后一个圆盘落下，从上往下依次跳一下
     const stack = [...this.pegs[TARGET]].reverse();
     stack.forEach((disc, k) => this.bounce(this.discEls[disc], 380 + k * 70));
+    // 告诉外壳这一局结束了，破了纪录的话外壳会弹出「新纪录！」
+    this.ctx.runEnded?.();
   }
 
   // ---------- 点按与拖动 ----------
@@ -612,7 +623,7 @@ class Hanoi {
   }
 
   updateChrome() {
-    const { levels, moves, least, board, tools, undo, result, resultTitle, resultText, again } = this.refs;
+    const { levels, moves, least, best, board, tools, undo, result, resultTitle, resultText, again } = this.refs;
     const won = this.status === 'won';
     // 赢了的棋盘带一圈绿光；放在这里，读档回来的已完成局面也有
     board.classList.toggle('is-won', won);
@@ -622,6 +633,10 @@ class Hanoi {
     moves.textContent = this.moves;
     least.textContent = ` / ${minMoves(this.discs)}`;
     this.renderTime();
+    // “用时”右边写着这一层的最快用时，还没完成过就不写
+    const fastest = this.records[`d${this.discs}`];
+    best.hidden = !fastest;
+    best.textContent = fastest ? `最快 ${clock(fastest)}` : '';
     this.updateTip();
 
     tools.hidden = won;

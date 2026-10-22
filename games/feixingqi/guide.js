@@ -45,7 +45,7 @@ function yard(x, y, size, color) {
 
 export default [
   {
-    title: '掷 6 起飞',
+    title: '掷6起飞',
     text: '掷到 6 才能从机场起飞，掷到 6 还能再掷一次。同一轮连掷三次 6，这一轮就作废。',
     art: svg(
       yard(28, 18, 104, 0)

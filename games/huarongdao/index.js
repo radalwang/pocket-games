@@ -436,6 +436,8 @@ class Huarongdao {
     this.records[this.level.id] = this.ctx.submitRecord(this.level.id, steps, { lowerIsBetter: true });
     this.record = previous === undefined ? 'first' : steps < previous ? 'best' : null;
     this.refs.note.classList.remove('is-visible');
+    // 告诉外壳这一关过了，破了纪录的话外壳会弹出「新纪录！」
+    this.ctx.runEnded?.();
   }
 
   bindBoard() {

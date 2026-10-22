@@ -75,6 +75,8 @@ class Game {
   }
 
   newGame() {
+    // 新开一局时告诉外壳：分数是边玩边报的，上一局中途破了纪录又放弃的话，不清掉会让这一局结束时误报「新纪录！」
+    this.ctx.runStarted?.();
     this.clearBoard();
     this.score = 0;
     this.won = false;
@@ -96,9 +98,12 @@ class Game {
     this.score = saved.score || 0;
     this.won = Boolean(saved.won);
     this.keepPlaying = Boolean(saved.keepPlaying);
-    this.over = Boolean(saved.over);
+    // 旧版本可能存下了“凑出 2048 后没法移动、却没判结束”的局面，这里重新判断一次，并把结果存回去
+    const stuck = !saved.over && !this.canMove();
+    this.over = Boolean(saved.over) || stuck;
     this.bestBefore = saved.bestBefore ?? this.best;
     this.updateScores();
+    if (stuck) this.save();
     if (this.over) this.showOver();
     else if (this.won && !this.keepPlaying) this.showWin();
   }
@@ -221,14 +226,15 @@ class Game {
     this.updateScores();
     this.timer = setTimeout(() => this.dropRetiring(), SLIDE_MS + 30);
 
-    if (!this.won && this.maxTile() >= 2048) {
-      this.won = true;
-      this.showWin();
-    } else if (!this.canMove()) {
-      this.over = true;
-      this.showOver();
-    }
+    const reachedGoal = !this.won && this.maxTile() >= 2048;
+    if (reachedGoal) this.won = true;
+    // 凑出 2048 的这一步也可能刚好没法再移动了，要一起判断，否则点“继续挑战”后会卡住
+    if (!this.canMove()) this.over = true;
+    if (this.over) this.showOver();
+    else if (reachedGoal) this.showWin();
     this.save();
+    // 一局结束时告诉外壳，破了纪录的话外壳会弹出「新纪录！」
+    if (this.over) this.ctx.runEnded?.();
   }
 
   maxTile() {
@@ -287,7 +293,14 @@ class Game {
 
   showWin() {
     this.showOverlay('凑出 2048 了！', `现在 ${fmt(this.score)} 分，可以继续挑战更大的数字`, [
-      { label: '新游戏', onClick: () => this.newGame() },
+      // 赢了不再接着玩，这一局就到此结束；接着玩的话等没法移动时再算结束
+      {
+        label: '新游戏',
+        onClick: () => {
+          this.ctx.runEnded?.();
+          this.newGame();
+        },
+      },
       {
         label: '继续挑战',
         primary: true,

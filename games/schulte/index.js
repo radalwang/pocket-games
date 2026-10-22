@@ -211,6 +211,7 @@ class Schulte {
     const previous = this.records[key];
     this.records[key] = this.ctx.submitRecord(key, time, { lowerIsBetter: true });
     this.record = previous === undefined ? 'first' : time < previous ? 'best' : null;
+    this.ctx.runEnded?.();
   }
 
   // ---------- 计时 ----------

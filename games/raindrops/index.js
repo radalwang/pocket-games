@@ -138,7 +138,11 @@ class Raindrops {
     this.resizer = new ResizeObserver(() => this.layout());
     this.resizer.observe(this.refs.sky);
     this.scheme = window.matchMedia('(prefers-color-scheme: dark)');
-    this.onScheme = () => this.readTheme();
+    // 停在面板上时循环不画了，换了深浅色要自己重画一次
+    this.onScheme = () => {
+      this.readTheme();
+      this.draw(performance.now());
+    };
     this.scheme.addEventListener('change', this.onScheme);
     this.readTheme();
 
@@ -207,6 +211,9 @@ class Raindrops {
 
   start() {
     this.newRun();
+    // 告诉外壳新开了一局（开始、重新开始、再来一局都走这里，读档接着玩的走 restore）：
+    // 上一局放弃之前破的纪录，不算到这一局头上
+    this.ctx.runStarted?.();
     this.startCountdown();
     this.save();
   }
@@ -259,6 +266,7 @@ class Raindrops {
     this.input = '';
     this.updateHud();
     this.save();
+    this.ctx.runEnded?.();
     clearTimeout(this.overTimer);
     this.overTimer = setTimeout(() => this.showOver(), 450);
   }
@@ -299,6 +307,7 @@ class Raindrops {
   hideOverlay() {
     this.refs.overlay.hidden = true;
     this.refs.overlay.replaceChildren();
+    this.wake();
   }
 
   // ---------- 存档 ----------
@@ -476,13 +485,25 @@ class Raindrops {
   // ---------- 每一帧 ----------
 
   setLoop(on) {
-    if (on && !this.raf) {
-      this.lastFrame = 0;
-      this.raf = requestAnimationFrame(this.frame);
-    } else if (!on && this.raf) {
+    this.looping = on;
+    if (on) this.wake();
+    else if (this.raf) {
       cancelAnimationFrame(this.raf);
       this.raf = 0;
     }
+  }
+
+  // 面板挡着天空时画完最后一帧循环就歇着（见 frame），面板收起时从这里叫醒
+  wake() {
+    if (!this.looping || this.raf) return;
+    this.lastFrame = 0;
+    this.raf = requestAnimationFrame(this.frame);
+  }
+
+  // 面板出来了，炸开的雨滴、水珠、「+120」、金光和涨水也都播完了：剩下的云和水波就停在这一帧，不再每帧重画
+  isStill(now) {
+    return !this.refs.overlay.hidden && !this.sparks.length && !this.pops.length && !this.floats.length
+      && now - this.flashAt >= 450 && Math.abs(this.water - this.waterLevel()) < 0.001;
   }
 
   frame(now) {
@@ -490,7 +511,7 @@ class Raindrops {
     this.lastFrame = now;
     this.update(dt, now);
     this.draw(now);
-    this.raf = requestAnimationFrame(this.frame);
+    this.raf = this.isStill(now) ? 0 : requestAnimationFrame(this.frame);
   }
 
   update(dt, now) {

@@ -330,9 +330,9 @@
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  height: 48px;
+  height: 56px;
   padding: 0 6px 0 16px;
-  border-radius: 24px;
+  border-radius: 28px;
   background: color-mix(in srgb, #34c759 18%, transparent);
   font-size: 15px;
   font-weight: 600;
@@ -343,11 +343,12 @@
   from { opacity: 0; transform: translateY(8px); }
 }
 
+/* 过关后只能点它往下走，按手指点按的 44px 做 */
 .skb-next {
   flex: none;
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 18px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 22px;
   background: var(--accent);
   color: #fff;
   font-size: 15px;

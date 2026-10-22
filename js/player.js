@@ -7,6 +7,10 @@
 //   ctx.save(state, info)     存档；info = { summary: 显示在继续条上的文字, finished: 这一局是否已结束 }
 //   ctx.submitRecord(key, value, { lowerIsBetter })
 //                             记录一项成绩，返回这一项更新后的最好成绩；用时这类越小越好的传 lowerIsBetter: true
+//                             在 boards.js 里有榜的成绩键，破了个人纪录会自动排进全网榜单的上传队列
+//   ctx.runEnded()            一局结束时调用（游戏结束、解开、过关）。这一局破了纪录的话，外壳弹出「新纪录！」和全网名次
+//   ctx.runStarted()          新开一局时调用。玩的过程中就一直在报成绩的游戏（2048、合数、像素小鸟、雨滴算术）要调：
+//                             上一局中途破了纪录又放弃的话，不清掉会让下一局结束时误报「新纪录！」
 // 卡片上怎么显示成绩，由 registry.js 里这个游戏的 formatRecord 决定。
 // mount 返回的对象可以有 pause()、resume()、destroy()：
 // 收起游戏页、切到后台或打开玩法介绍时调用 pause，回来时调用 resume，卸载时调用 destroy。
@@ -18,6 +22,8 @@ import { getGame } from './registry.js';
 import { prefs, progress } from './store.js';
 import { cover } from './covers.js';
 import { esc, setBehind, toast } from './ui.js';
+import { BOARDS, boardOf, formatValue } from './boards.js';
+import { fetchBoard, queueScore } from './scores.js';
 
 const app = document.getElementById('app');
 const sheet = document.getElementById('player');
@@ -77,11 +83,22 @@ async function mountGame(game) {
     const root = document.createElement('div');
     root.className = 'game-root';
     stage.replaceChildren(root);
+    const run = new Map(); // 这一局破了纪录的成绩键 → 这一局开始前的最好成绩
     return module.default.mount(root, {
       saved,
       records: progress.getRecords(game.id),
       save: (state, info) => progress.setSave(game.id, state, info),
-      submitRecord: (key, value, options) => progress.submitRecord(game.id, key, value, options),
+      submitRecord: (key, value, options) => {
+        const before = progress.getRecords(game.id)[key];
+        const best = progress.submitRecord(game.id, key, value, options);
+        if (best === value && before !== value) {
+          queueScore(game.id, key, value);
+          if (!run.has(key)) run.set(key, before);
+        }
+        return best;
+      },
+      runEnded: () => cheer(game.id, run),
+      runStarted: () => run.clear(),
     });
   };
 
@@ -115,8 +132,65 @@ async function mountGame(game) {
   return true;
 }
 
+// ---------- 破纪录的庆祝 ----------
+// 一局结束时：破了以前的纪录就弹「新纪录！」，等服务器回了名次再补上「全网第 N 名」；
+// 第一次有成绩（以前没有纪录）不算破纪录，只在排进前 100 时提示「已上榜」。点一下去榜单页看这个榜
+
+const cheerEl = sheet.querySelector('.cheer');
+let cheerTimer = 0;
+let cheerBoard = null; // { game, key }
+
+function cheer(gameId, run) {
+  const entries = [...run].filter(([key]) => boardOf(gameId, key));
+  run.clear();
+  if (!entries.length) return;
+  const beaten = entries.find(([, before]) => before !== undefined);
+  const [key] = beaten ?? entries[0];
+  const board = boardOf(gameId, key);
+  // 只有一个榜的游戏不用写榜名（免得出现「分数 12,345 分」）
+  const label = BOARDS[gameId].length > 1 ? `${board.label} ` : '';
+  const detail = `${label}${formatValue(board, progress.getRecords(gameId)[key])}`;
+  if (beaten) showCheer(gameId, key, '新纪录！', detail);
+  fetchBoard(gameId, key).then(({ mine }) => {
+    if (!mine) return;
+    const text = `${detail} · 全网第 ${mine.rank} 名`;
+    if (beaten && cheerBoard?.game === gameId && cheerBoard.key === key && !cheerEl.hidden) {
+      cheerEl.querySelector('.cheer-detail').textContent = text;
+    } else if (!beaten && mine.rank <= 100) {
+      showCheer(gameId, key, '已上榜', text);
+    }
+  }).catch(() => {});
+}
+
+function showCheer(gameId, key, title, detail) {
+  cheerBoard = { game: gameId, key };
+  cheerEl.querySelector('.cheer-title').textContent = title;
+  cheerEl.querySelector('.cheer-detail').textContent = detail;
+  cheerEl.hidden = false;
+  void cheerEl.offsetWidth;
+  cheerEl.classList.add('is-visible');
+  clearTimeout(cheerTimer);
+  cheerTimer = setTimeout(hideCheer, 5000);
+}
+
+function hideCheer() {
+  clearTimeout(cheerTimer);
+  cheerEl.classList.remove('is-visible');
+  cheerTimer = setTimeout(() => {
+    cheerEl.hidden = true;
+  }, 300);
+}
+
+// 点庆祝条：收起游戏页，去榜单页看这个榜（榜单页监听 leaderboard:show）
+cheerEl.addEventListener('click', () => {
+  hideCheer();
+  collapse();
+  document.dispatchEvent(new CustomEvent('leaderboard:show', { detail: cheerBoard }));
+});
+
 function unmountGame() {
   hideGuide();
+  if (!cheerEl.hidden) hideCheer();
   current?.instance.destroy?.();
   current = null;
   stage.replaceChildren();

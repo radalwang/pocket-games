@@ -1,14 +1,19 @@
-// 飞行棋：你和 1–3 个电脑轮流掷骰子，谁先把自己的飞机全部飞进中间的终点谁赢。
-// 规则在 rules.js，棋盘在 board.js，电脑在 ai.js；一局怎么进行、存档和以后联机的接口在 match.js。
+// 飞行棋：你和 1–3 个电脑轮流掷骰子，谁先把自己的飞机全部飞进中间的终点谁赢；也可以联机和别人玩。
+// 规则在 rules.js，棋盘在 board.js，电脑在 ai.js；一局怎么进行、存档和联机的接口在 match.js。
 // 这里只管画棋盘、放动画、接收点击：本机的人点骰子和飞机，电脑由这里定时替它走。接口说明见 js/player.js。
+// 联机对战（大厅在 js/lobby.js，消息格式见 server/PROTOCOL.md）时服务器说了算：点骰子、点飞机只发意图，
+// 服务器广播回来的动作排着队一个个放动画，放完告诉服务器；电脑、超时和掉线的人都由服务器替他走。
 
 import guide from './guide.js';
 import { chooseMove } from './ai.js';
 import {
   COLOR_NAMES, goalSpot, goalTriangle, hangarSpot, LOOP, loopCenter, loopColor, padSpot, runwayCenter, RUNWAYS, SIZE, START, yardRect,
 } from './board.js';
-import { FLY_FROM, FLY_TO, GOAL, HANGAR, LAST_LOOP, legalPlanes, loopIndex, TAKEOFF } from './rules.js';
+import { FLY_FROM, FLY_TO, GOAL, HANGAR, LAST_LOOP, legalPlanes, loopIndex, RULES_VERSION, TAKEOFF } from './rules.js';
 import { Match, newSetup } from './match.js';
+import { openLobby } from '../../js/lobby.js';
+import { Connection } from '../../js/online.js';
+import { esc } from '../../js/ui.js';
 
 // 电脑掷骰子、选飞机前停一下，看得清它在干什么；只有一种走法时本机也自动走
 const AI_ROLL_MS = 550;
@@ -16,6 +21,9 @@ const AI_MOVE_MS = 450;
 const AUTO_MOVE_MS = 320;
 const STEP_MS = 140;
 const ROLL_MS = 480;
+// 联机：服务器给每一步限时 15 秒（server/games.js），牌子底下的细条按这个长度缩短；断线后隔多久重连一次
+const TURN_MS = 15000;
+const RETRY_MS = [1000, 2000, 4000, 8000];
 
 // 每方的颜色：飞机用最饱和的，大圈的格子用浅一点的，机场用更浅的底色
 const PLANE_COLORS = ['#ff3b30', '#ffbf00', '#0a84ff', '#30c35a'];
@@ -98,7 +106,7 @@ const DEFAULT_SETUP = { opponents: 1, color: 0, planes: 4 };
 
 const isSetup = (s) => s && [1, 2, 3].includes(s.opponents) && [0, 1, 2, 3].includes(s.color) && [2, 4].includes(s.planes);
 
-// 从存档重放出那一局。座位要正好一个本机的人、其余都是电脑（联机还没做，远程座位会一直干等）；不对就抛错
+// 从存档重放出那一局。座位要正好一个本机的人、其余都是电脑（联机对局不这样存，见 saveOnline）；不对就抛错
 function restoreMatch(saved) {
   const { config, seats, log } = saved.match ?? {};
   if (!Array.isArray(log)) throw new Error('存档里没有走棋记录');
@@ -107,6 +115,13 @@ function restoreMatch(saved) {
     throw new Error('存档里的座位不对');
   }
   return match;
+}
+
+// 联机对局的存档里只有房间和凭证，局面要连上服务器再要回来；不对就抛错
+function onlineSave(saved) {
+  const { room, token } = saved.online;
+  if (typeof room !== 'string' || typeof token !== 'string') throw new Error('存档里的联机凭证不对');
+  return { room, token };
 }
 
 class Feixingqi {
@@ -124,9 +139,14 @@ class Feixingqi {
     this.choices = [];
     this.match = null;
     this.unlisten = null;
-    // 有存档先把那一局重放出来：用不了就直接抛错，这时还没挂任何监听，外壳会丢掉存档重新开一局
+    this.lobby = null; // 开着的联机大厅
+    this.online = null; // 联机对局的连接和状态，见 goOnline
+    this.subText = '';
+    // 有存档先把那一局重放出来：用不了就直接抛错，这时还没挂任何监听，外壳会丢掉存档重新开一局。
+    // 联机对局的存档要连上服务器才能回去；联机结束后的存档（ended）只留开局设置
     const saved = ctx.saved;
-    const restored = saved == null ? null : restoreMatch(saved);
+    const rejoining = saved?.online ? onlineSave(saved) : null;
+    const restored = saved == null || rejoining || saved.ended === true ? null : restoreMatch(saved);
     this.setup = isSetup(saved?.setup) ? saved.setup : { ...DEFAULT_SETUP };
     // 这一局本机的人赢了有没有记进成绩，跟着存档走，免得漏记或重复记
     this.counted = saved?.counted === true;
@@ -154,8 +174,14 @@ class Feixingqi {
     this.scheme.addEventListener('change', this.onScheme);
     this.resizer = new ResizeObserver(() => this.layout());
     this.resizer.observe(this.refs.stage);
+    this.onVisibility = () => this.visibilityChanged();
+    document.addEventListener('visibilitychange', this.onVisibility);
 
-    if (restored) {
+    if (rejoining) {
+      this.online = this.newOnline(rejoining);
+      this.showRejoining();
+      this.rejoin();
+    } else if (restored) {
       this.attach(restored);
       // 上次赢了、但动画没放完就被关掉的，这里补记上
       this.countWin();
@@ -171,6 +197,8 @@ class Feixingqi {
 
   // 按设置开一局：我是 setup.color，电脑坐在其余的位置上（只有一个电脑时坐对面）
   start(setup = this.setup) {
+    this.closeLobby();
+    this.dropOnline();
     this.setup = setup;
     const others = [2, 1, 3].map((k) => (setup.color + k) % 4).slice(0, setup.opponents);
     const players = [
@@ -197,6 +225,8 @@ class Feixingqi {
     this.tweens = [];
     this.sparks = [];
     this.busy = false;
+    // 换局时上一局的骰子可能正转到一半（那段动画不会再放完了），别让它一直抖
+    this.refs.dice.classList.remove('is-rolling');
     this.syncDisplay();
     this.drawBoardLayer();
     this.renderPlayers();
@@ -204,21 +234,31 @@ class Feixingqi {
   }
 
   askNewGame() {
-    const playing = this.match && this.match.state.phase !== 'over' && this.match.log.length > 0;
+    // 联机对局退出后座位由电脑代打，凭存档也不再回去
+    if (this.online && !this.online.closed) {
+      if (!window.confirm('退出联机对局？你的座位会交给电脑')) return;
+      this.online.conn?.send({ t: 'leave' });
+      this.endOnline('已退出联机对局', '');
+      return;
+    }
+    const playing = !this.online && this.match && this.match.state.phase !== 'over' && this.match.log.length > 0;
     if (playing && !window.confirm('重新开始会放弃这一局，确定吗？')) return;
     this.showSetup();
   }
 
   // ---------- 开局设置和结束面板 ----------
 
-  showSetup() {
+  // note 是顶上的一行说明，比如「这局联机已经结束」
+  showSetup(note = '') {
     clearTimeout(this.timer);
+    this.closeLobby();
     const { overlay } = this.refs;
     const choice = (name, value, label, extra = '') =>
       `<button data-${name}="${value}"${extra}>${label}</button>`;
     overlay.innerHTML = `
       <div class="fx-panel">
         <h3>飞行棋</h3>
+        ${note ? `<p>${esc(note)}</p>` : ''}
         <div class="fx-field"><span>对手</span><div class="fx-seg" data-group="opponents">
           ${[1, 2, 3].map((n) => choice('opponents', n, `${n} 个电脑`)).join('')}
         </div></div>
@@ -229,6 +269,7 @@ class Feixingqi {
           ${choice('planes', 4, '每方 4 架')}${choice('planes', 2, '2 架快速局')}
         </div></div>
         <button class="fx-btn is-primary" data-start>开始</button>
+        <button class="fx-btn" data-online>联机对战</button>
       </div>`;
     const draft = { ...this.setup };
     const mark = () => overlay.querySelectorAll('[data-group]').forEach((group) => {
@@ -242,6 +283,12 @@ class Feixingqi {
         this.start(draft);
         return;
       }
+      if (button.hasAttribute('data-online')) {
+        // 选好的颜色和飞机数记下来：大厅里开房间用这个飞机数，「和电脑玩」也照这个开
+        this.setup = draft;
+        this.showLobby();
+        return;
+      }
       const group = button.parentElement.dataset.group;
       if (group) {
         draft[group] = Number(button.dataset[group]);
@@ -250,7 +297,7 @@ class Feixingqi {
     });
     mark();
     overlay.hidden = false;
-    this.say('选好对手和颜色，点「开始」', '');
+    this.say(note || '选好对手和颜色，点「开始」', '');
     this.refs.dice.disabled = true;
   }
 
@@ -258,21 +305,55 @@ class Feixingqi {
     const { state } = this.match;
     const won = state.winner === this.me;
     const { overlay } = this.refs;
-    const color = COLOR_NAMES[this.match.config.players[state.winner].color];
+    const winner = this.sideName(state.winner);
+    // 联机时「再来一局」回到大厅重新匹配，「返回」回到开局设置
     overlay.innerHTML = `
       <div class="fx-panel">
-        <h3>${won ? '你赢了！' : `${color}方赢了`}</h3>
+        <h3>${won ? '你赢了！' : `${esc(winner)}赢了`}</h3>
         <p>${won ? `一共赢了 ${this.wins} 局` : '再来一局，下次一定'}</p>
         <div class="fx-actions">
-          <button class="fx-btn" data-setup>换个设置</button>
+          <button class="fx-btn" data-setup>${this.online ? '返回' : '换个设置'}</button>
           <button class="fx-btn is-primary" data-again>再来一局</button>
         </div>
       </div>`;
     overlay.querySelector('[data-setup]').addEventListener('click', () => this.showSetup());
-    overlay.querySelector('[data-again]').addEventListener('click', () => this.start());
+    overlay.querySelector('[data-again]').addEventListener('click', () => (this.online ? this.showLobby() : this.start()));
     overlay.hidden = false;
-    this.say(won ? '你赢了！' : `${color}方赢了`, '');
+    this.say(won ? '你赢了！' : `${winner}赢了`, '');
     this.refs.dice.disabled = true;
+  }
+
+  // 联机大厅画在遮罩里，和开局设置面板一样居中
+  showLobby() {
+    clearTimeout(this.timer);
+    this.closeLobby();
+    this.refs.overlay.hidden = false;
+    this.lobby = openLobby(this.refs.overlay, {
+      game: 'feixingqi',
+      rules: RULES_VERSION,
+      title: '飞行棋',
+      options: [{ key: 'planes', label: '飞机', choices: [{ value: 4, label: '每方 4 架' }, { value: 2, label: '2 架快速局' }], value: this.setup.planes }],
+      onStart: (conn, start) => {
+        this.lobby = null;
+        this.goOnline(conn, start);
+      },
+      onBack: () => {
+        this.lobby = null;
+        this.showSetup();
+      },
+      onSolo: () => {
+        this.lobby = null;
+        this.start({ ...this.setup, opponents: 3 });
+      },
+    });
+    this.say('联机对战', '');
+    this.refs.dice.disabled = true;
+    this.refs.dice.classList.remove('is-ready');
+  }
+
+  closeLobby() {
+    this.lobby?.close();
+    this.lobby = null;
   }
 
   hideOverlay() {
@@ -283,6 +364,10 @@ class Feixingqi {
   // ---------- 存档 ----------
 
   save() {
+    if (this.online) {
+      this.saveOnline();
+      return;
+    }
     const player = this.match?.config.players[this.me];
     if (!player) return;
     const { state, config } = this.match;
@@ -290,6 +375,20 @@ class Feixingqi {
     let summary = `你是${color}方 · 已到终点 ${state.planes[this.me].filter((p) => p === GOAL).length}/${config.planes} 架`;
     if (state.phase === 'over') summary = state.winner === this.me ? `你赢了 · 一共赢了 ${this.wins} 局` : `${COLOR_NAMES[config.players[state.winner].color]}方赢了`;
     this.ctx.save({ match: this.match.toJSON(), setup: this.setup, counted: this.counted }, { summary, finished: state.phase === 'over' });
+  }
+
+  // 联机对局只存房间和凭证：局面在服务器上，回来时凭它们要回整局。counted 也存着，回来时不会重复记赢。
+  // 下完了、退出了、服务器上没有了，就只留开局设置（ended），再打开时不再连服务器
+  saveOnline() {
+    const { online, match } = this;
+    const over = match?.state.phase === 'over';
+    if (over || online.closed) {
+      const summary = over ? (match.state.winner === this.me ? `你赢了 · 一共赢了 ${this.wins} 局` : `${this.sideName(match.state.winner)}赢了`) : online.summary;
+      this.ctx.save({ setup: this.setup, ended: true }, { summary, finished: true });
+    } else if (match) {
+      const color = COLOR_NAMES[match.config.players[this.me].color];
+      this.ctx.save({ online: { room: online.room, token: online.token }, setup: this.setup, counted: this.counted }, { summary: `联机对战中 · 你是${color}方`, finished: false });
+    }
   }
 
   // 本机的人赢了就马上记一局，不等动画放完（放到一半被关掉也不会漏记）；记过就标上 counted，同一局只记一次
@@ -306,7 +405,15 @@ class Feixingqi {
   who(player) {
     const { config, seats } = this.match;
     const color = COLOR_NAMES[config.players[player].color];
-    return seats[player] === 'local' ? `你（${color}方）` : `${color}方`;
+    if (seats[player] === 'local') return `你（${color}方）`;
+    // 联机时带上昵称
+    const name = this.online?.players[player]?.name;
+    return name ? `${name}（${color}方）` : `${color}方`;
+  }
+
+  // 不是你的那一方叫什么：单机是「红方」，联机是昵称
+  sideName(player) {
+    return this.online?.players[player]?.name ?? `${COLOR_NAMES[this.match.config.players[player].color]}方`;
   }
 
   // 一步放完动画之后，看下一步该谁、干什么：本机的人就等他点，电脑就定时替它走，远程的就等消息
@@ -325,8 +432,13 @@ class Feixingqi {
     this.refs.dice.classList.remove('is-ready');
     if (state.phase === 'over') {
       this.showOver();
+    } else if (this.online && !this.online.ready) {
+      // 联机断开了、正在连回去：先什么都不能点
+      this.say(this.online.notice || '正在回到联机对局…', '');
     } else if (match.kind === 'local') {
-      if (state.phase === 'roll') {
+      if (match.pending) {
+        // 联机：意图已经发给服务器了，等它广播回来
+      } else if (state.phase === 'roll') {
         this.refs.dice.disabled = false;
         this.refs.dice.classList.add('is-ready');
         this.refs.dice.style.setProperty('--c', PLANE_COLORS[match.config.players[player].color]);
@@ -346,6 +458,10 @@ class Feixingqi {
       this.say(`${this.who(player)}（电脑）`, state.phase === 'roll' ? '掷骰子…' : `掷出 ${state.dice}，想一想…`);
       if (state.phase === 'roll') this.later(() => match.roll(), AI_ROLL_MS);
       else this.later(() => match.move(chooseMove(match.config, state)), AI_MOVE_MS);
+    } else if (this.online) {
+      // 联机的别人（包括服务器替它走的电脑）：等服务器广播，由 drain 放出来
+      const away = this.online.players[player]?.away;
+      this.say(`等${this.who(player)}…`, away ? '掉线了 · 电脑代打' : state.phase === 'move' ? `掷出 ${state.dice}，在选飞机` : '');
     } else {
       // 远程座位：等联机消息（match.receive），这里什么也不用做
       this.say(`等${this.who(player)}…`, '');
@@ -365,6 +481,13 @@ class Feixingqi {
   rollByHand() {
     const match = this.match;
     if (!match || this.busy || match.kind !== 'local' || match.state.phase !== 'roll') return;
+    if (this.online) {
+      // 联机：只告诉服务器「我要掷」，点数由它掷好广播回来；等回音时骰子先按不动，免得连点
+      if (!this.online.ready || !match.roll()) return;
+      this.refs.dice.disabled = true;
+      this.refs.dice.classList.remove('is-ready');
+      return;
+    }
     match.roll();
   }
 
@@ -403,8 +526,13 @@ class Feixingqi {
     }));
   }
 
-  // 一段动画：每帧调用 update(进度 0–1)，放完 resolve。上一段放完时动画循环可能已经停了，这里重新拉起来
+  // 一段动画：每帧调用 update(进度 0–1)，放完 resolve。上一段放完时动画循环可能已经停了，这里重新拉起来。
+  // 联机时游戏页收起了或者在看玩法介绍：别人不等你，动画直接跳到结尾，回来时看到的就是最新的局面
   tween(ms, update) {
+    if (this.online && !this.active) {
+      update(1);
+      return Promise.resolve();
+    }
     const done = new Promise((resolve) => this.tweens.push({ ms, t: 0, update, resolve }));
     this.startLoop();
     return done;
@@ -440,7 +568,9 @@ class Feixingqi {
     this.syncDisplay();
     this.renderPlayers();
     this.save();
-    this.advance();
+    // 联机：接着放排着队的下一步，都放完了 drain 会告诉服务器
+    if (this.online) this.drain();
+    if (!this.busy) this.advance();
   }
 
   async playEvent(event) {
@@ -740,13 +870,26 @@ class Feixingqi {
   renderPlayers() {
     if (!this.match) return;
     const { config, state, seats } = this.match;
+    const online = this.online;
     // 四方时牌子最窄，样式里收紧一点，保证名字露得出来
     this.refs.players.classList.toggle('is-four', config.players.length === 4);
+    this.refs.players.classList.toggle('is-online', Boolean(online));
     this.refs.players.innerHTML = config.players.map((p, k) => {
       const home = state.planes[k].filter((at) => at === GOAL).length;
+      const turn = k === state.turn && state.phase !== 'over';
+      if (online) {
+        // 联机的牌子写两行：昵称（太长就省略）和到终点几架；掉线的变淡、写「掉线代打」；正在计时的人底下有根细条在缩短
+        const info = online.players[k] ?? {};
+        const name = seats[k] === 'local' ? '你' : esc(info.name ?? COLOR_NAMES[p.color]);
+        const left = online.turn?.seat === k ? Math.max(0, online.turn.endsAt - Date.now()) : -1;
+        const timer = left >= 0 ? `<u style="animation-duration:${TURN_MS}ms;animation-delay:-${Math.max(0, TURN_MS - left)}ms"></u>` : '';
+        return `<div class="fx-chip${turn ? ' is-turn' : ''}${info.away ? ' is-away' : ''}" style="--c:${PLANE_COLORS[p.color]}">
+          <i></i><span><b>${name}</b><small>${info.away ? '掉线代打' : `${home}/${config.planes}`}</small></span>${timer}
+        </div>`;
+      }
       // 四方时每个牌子很窄，只写一个字：你，或者那一方的颜色
       const name = seats[k] === 'local' ? '你' : COLOR_NAMES[p.color];
-      return `<div class="fx-chip${k === state.turn && state.phase !== 'over' ? ' is-turn' : ''}" style="--c:${PLANE_COLORS[p.color]}">
+      return `<div class="fx-chip${turn ? ' is-turn' : ''}" style="--c:${PLANE_COLORS[p.color]}">
         <i></i><b>${name}</b><small>${home}/${config.planes}</small>
       </div>`;
     }).join('');
@@ -754,7 +897,17 @@ class Feixingqi {
 
   say(msg, sub) {
     this.refs.msg.textContent = msg;
-    this.refs.sub.textContent = sub;
+    this.subText = sub;
+    this.renderClock();
+  }
+
+  // 第二行提示；联机轮到你、服务器在计时的时候后面跟着「还剩几秒」，最后 5 秒变红
+  renderClock() {
+    const turn = this.online?.turn;
+    const mine = Boolean(turn) && turn.seat === this.me && !this.busy;
+    const left = mine ? Math.max(0, Math.ceil((turn.endsAt - Date.now()) / 1000)) : 0;
+    this.refs.sub.textContent = mine ? [this.subText, `还剩 ${left} 秒`].filter(Boolean).join(' · ') : this.subText;
+    this.refs.sub.classList.toggle('is-hurry', mine && left <= 5);
   }
 
   toast(text) {
@@ -764,6 +917,286 @@ class Feixingqi {
     toast.classList.remove('is-out');
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => toast.classList.add('is-out'), 1400);
+  }
+
+  // ---------- 联机对战 ----------
+  //
+  // this.online 在显示联机对局（或正在连回联机对局）时都在，开新的一局（单机或联机）时才换掉：
+  //   room、token  凭它们回到这一局（存档里也是这两样）
+  //   conn、offs   现在的连接和挂在上面的监听，断开时为 null
+  //   ready        连上了、局面也和服务器对上了，这时才能点；notice 是没对上时状态栏写什么
+  //   players      服务器给的 [{ name, ai, away }]，按座位排
+  //   queue        动画放着时收到的动作，放完一个接一个执行
+  //   turn         服务器正在给谁计时：{ seat, endsAt }
+  //   closed       这局已经下完、退出了或者服务器上没有了，不再连；summary 是这时存档的说明
+
+  newOnline({ room, token }) {
+    return {
+      room, token, conn: null, offs: [], ready: false, notice: '', players: [], queue: [], turn: null,
+      ticker: 0, attempt: 0, retryTimer: 0, closed: false, summary: '',
+    };
+  }
+
+  // 大厅里凑齐人开局了：连接从此归这里管
+  goOnline(conn, start) {
+    this.dropOnline();
+    this.online = this.newOnline(start);
+    this.counted = false;
+    this.useConnection(conn);
+    this.loadStart(start, true);
+  }
+
+  useConnection(conn) {
+    const online = this.online;
+    this.dropConnection();
+    online.conn = conn;
+    online.offs = [
+      conn.on('start', (m) => this.loadStart(m)),
+      conn.on('act', (m) => this.received(m)),
+      conn.on('turn', (m) => this.setTurn({ seat: m.seat, endsAt: Date.now() + m.ms })),
+      conn.on('presence', (m) => this.presence(m)),
+      conn.on('error', (m) => this.serverError(m)),
+      conn.on('close', () => this.connectionLost()),
+    ];
+  }
+
+  // 断开现在的连接（不算意外断开）：排着队的动作和计时都作废，连回来时服务器会发完整的 start
+  dropConnection() {
+    const online = this.online;
+    if (!online) return;
+    online.offs.forEach((off) => off());
+    online.offs = [];
+    online.conn?.close();
+    online.conn = null;
+    online.ready = false;
+    online.queue = [];
+    this.setTurn(null);
+  }
+
+  // 彻底放下联机（开新的一局、游戏被卸载）：不发 leave，服务器照样让电脑代打，凭存档里的凭证还能回去
+  dropOnline() {
+    if (!this.online) return;
+    clearTimeout(this.online.retryTimer);
+    this.dropConnection();
+    this.online = null;
+  }
+
+  // 开局或回到对局：服务器发来完整的 start，按 log 直接重放出局面，不放动画
+  loadStart(start, fresh = false) {
+    const online = this.online;
+    if (!online || start.game !== 'feixingqi') return;
+    let match;
+    try {
+      const seats = start.config.players.map((_, k) => (k === start.seat ? 'local' : 'remote'));
+      match = new Match({ config: start.config, seats, log: start.log, server: (action) => this.online?.conn?.send({ t: 'act', action }) });
+    } catch {
+      this.endOnline('这局联机读不出来了');
+      return;
+    }
+    clearTimeout(online.retryTimer);
+    Object.assign(online, { room: start.room, token: start.token, players: start.players, queue: [], ready: true, notice: '', attempt: 0 });
+    this.setTurn(null);
+    this.attach(match);
+    this.hideOverlay();
+    if (match.state.dice) this.setFace(match.state.dice);
+    // 不在的这段时间里赢了的（比如电脑替你走完的），这里补记上；记过的不会再记
+    this.countWin();
+    if (fresh) this.toast(`${this.who(match.state.turn)}先走`);
+    this.save();
+    this.sendIdle();
+    if (match.state.phase === 'over') this.finishOnline();
+    this.advance();
+  }
+
+  // 服务器广播的动作先排队，前面的动画放完再一个个执行
+  received({ seq, action }) {
+    const online = this.online;
+    if (!online.ready || !this.match) return;
+    this.setTurn(null); // 有人出手了，这一步的计时作废，下一步服务器会重新发 turn
+    online.queue.push({ seq, action });
+    this.drain();
+  }
+
+  // 把排着队的动作一个个放出来；都放完了告诉服务器（idle），它才会让下一个人出手、开始计时
+  drain() {
+    const { online, match } = this;
+    if (!online?.ready || !match || this.busy) return;
+    while (online.queue.length && !this.busy) {
+      const { seq, action } = online.queue.shift();
+      // 没点就轮到自己的动作：超时了，服务器替你走的
+      const forced = action?.seat === this.me && seq === match.log.length && !match.pending;
+      try {
+        if (!match.accept(seq, action)) continue; // 重复收到的，早就执行过了
+      } catch {
+        this.resync();
+        return;
+      }
+      if (forced) this.toast('时间到，电脑替你走了一步');
+      if (match.state.phase === 'over') {
+        this.finishOnline();
+        return;
+      }
+    }
+    if (!this.busy) this.sendIdle();
+  }
+
+  sendIdle() {
+    this.online?.conn?.send({ t: 'idle', seq: this.match.log.length });
+  }
+
+  // 和服务器对不上了（漏收了动作，或者动作执行不了）：整局重新要一次，服务器回 start 后重建
+  resync() {
+    const online = this.online;
+    online.ready = false;
+    online.queue = [];
+    online.conn?.send({ t: 'resume', room: online.room, token: online.token });
+  }
+
+  setTurn(turn) {
+    const online = this.online;
+    if (!online) return;
+    online.turn = turn;
+    clearInterval(online.ticker);
+    online.ticker = turn ? setInterval(() => this.renderClock(), 250) : 0;
+    this.renderClock();
+    this.renderPlayers();
+  }
+
+  presence({ seat, away }) {
+    const p = this.online.players[seat];
+    if (!p || p.away === away) return;
+    p.away = away;
+    this.toast(away ? `${p.name}掉线了，由电脑代打` : `${p.name}回来了`);
+    this.renderPlayers();
+    if (!this.busy && this.match?.state.turn === seat) this.advance();
+  }
+
+  serverError({ code, message }) {
+    if (code === 'no-game') {
+      this.endOnline('这局联机已经结束');
+      return;
+    }
+    // 意图没被接受（多半是刚好超时，服务器已经替你走了）：不用提示，可以再点
+    this.match?.reject();
+    if (code !== 'bad-action') this.toast(message);
+    if (!this.busy) this.advance();
+  }
+
+  // 连接意外断了：在前台就重连，切到后台断的不管，回到前台时会连
+  connectionLost() {
+    const online = this.online;
+    this.dropConnection();
+    if (online.closed || document.hidden) return;
+    this.retry();
+  }
+
+  // 隔 1、2、4、8 秒重连一次，都连不上就让玩家选重试还是退出
+  retry(err) {
+    const online = this.online;
+    if (online.attempt >= RETRY_MS.length) {
+      this.showOffline(err?.message ?? '连不上联机服务器');
+      return;
+    }
+    online.notice = '连接断了，正在重连…';
+    online.retryTimer = setTimeout(() => this.rejoin(), RETRY_MS[online.attempt++]);
+    if (!this.busy) this.advance();
+  }
+
+  // 连上服务器回到这一局：重新打开 App、从后台回来、断线重连都走这里。服务器回 start 后由 loadStart 重建
+  async rejoin() {
+    const online = this.online;
+    if (!online || online.closed || document.hidden) return;
+    clearTimeout(online.retryTimer);
+    const conn = new Connection();
+    this.useConnection(conn);
+    try {
+      await conn.connect();
+    } catch (err) {
+      if (this.online !== online || online.conn !== conn) return; // 等的时候已经退出或者换了连接
+      this.dropConnection();
+      // 服务器没上线、版本对不上，重试也没用
+      if (err.code === 'no-server' || err.code === 'version') this.endOnline(err.message);
+      else this.retry(err);
+      return;
+    }
+    if (this.online !== online || online.conn !== conn) return;
+    conn.send({ t: 'resume', room: online.room, token: online.token });
+  }
+
+  // 联机时自己管前后台：切到后台马上断开（服务器让电脑先替你走），回到前台再连上回到这一局。
+  // 收起游戏页、看玩法介绍不算，连接一直留着，免得看一眼介绍座位就交给电脑
+  visibilityChanged() {
+    const online = this.online;
+    if (!online || online.closed) return;
+    if (document.hidden) {
+      clearTimeout(online.retryTimer);
+      this.dropConnection();
+      return;
+    }
+    if (online.conn) return; // 已经连着或者正在连
+    online.attempt = 0;
+    online.notice = '正在回到联机对局…';
+    if (!this.refs.overlay.hidden) this.showRejoining();
+    else if (!this.busy) this.advance();
+    this.rejoin();
+  }
+
+  // 这局下完了：连接用不着了，存档记成已结束
+  finishOnline() {
+    const online = this.online;
+    clearTimeout(online.retryTimer);
+    this.dropConnection();
+    online.closed = true;
+    this.save();
+  }
+
+  // 这局联机没法继续了（服务器上没有了、主动退出、连不上放弃）：回到开局设置，存档里不再留房间和凭证。
+  // summary 写在继续条上，note 写在开局设置面板上
+  endOnline(summary, note = summary) {
+    const online = this.online;
+    clearTimeout(online.retryTimer);
+    this.dropConnection();
+    online.closed = true;
+    online.summary = summary;
+    this.save();
+    this.showSetup(note);
+  }
+
+  // 打开 App 回到联机对局时，连上之前盖在棋盘上的面板
+  showRejoining() {
+    this.refs.overlay.innerHTML = `
+      <div class="fx-panel">
+        <h3>联机对战</h3>
+        <p class="fx-wait"><span class="fx-spinner"></span>正在回到联机对局…</p>
+      </div>`;
+    this.refs.overlay.hidden = false;
+    this.say('正在回到联机对局…', '');
+    this.refs.dice.disabled = true;
+    this.refs.dice.classList.remove('is-ready');
+  }
+
+  // 重连了几次都不行：重试，或者退出（座位留给电脑，不再回去）
+  showOffline(message) {
+    const { overlay } = this.refs;
+    overlay.innerHTML = `
+      <div class="fx-panel">
+        <h3>连不上联机对局</h3>
+        <p>${esc(message)}</p>
+        <div class="fx-actions">
+          <button class="fx-btn" data-quit>退出</button>
+          <button class="fx-btn is-primary" data-retry>重试</button>
+        </div>
+      </div>`;
+    overlay.querySelector('[data-quit]').addEventListener('click', () => this.endOnline('已退出联机对局', ''));
+    overlay.querySelector('[data-retry]').addEventListener('click', () => {
+      this.online.attempt = 0;
+      this.showRejoining();
+      this.rejoin();
+    });
+    overlay.hidden = false;
+    this.say('连不上联机对局', '');
+    this.refs.dice.disabled = true;
+    this.refs.dice.classList.remove('is-ready');
   }
 
   // ---------- 生命周期 ----------
@@ -778,8 +1211,16 @@ class Feixingqi {
     this.lastFrame = 0;
   }
 
+  // 外壳收起游戏页、切到后台、打开玩法介绍时调用。联机的连接不在这里断（切后台由 visibilityChanged 管）
   pause() {
     this.stop();
+    // 联机时正在放的动画直接跳到结尾（见 tween），排着队的动作接着执行，不让别人等
+    if (this.online) {
+      for (const tween of this.tweens.splice(0)) {
+        tween.update(1);
+        tween.resolve();
+      }
+    }
     this.save();
   }
 
@@ -792,6 +1233,9 @@ class Feixingqi {
   destroy() {
     this.stop();
     this.unlisten?.();
+    this.closeLobby();
+    this.dropOnline();
+    document.removeEventListener('visibilitychange', this.onVisibility);
     clearTimeout(this.toastTimer);
     this.resizer.disconnect();
     this.scheme.removeEventListener('change', this.onScheme);

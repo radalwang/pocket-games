@@ -134,6 +134,13 @@
   color: #0f4a5e;
 }
 
+/* 按钮画 38px，点按范围往外扩一圈到 44×44；天空里点了本来就没有反应，扩出去不会吃掉别的操作 */
+.rd-pause::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+}
+
 .rd-pause svg { width: 18px; height: 18px; }
 
 @media (prefers-color-scheme: dark) {
@@ -281,7 +288,7 @@
   display: grid;
   place-items: center;
   width: 46px;
-  height: 40px;
+  height: 44px;
   border-radius: 10px;
   color: var(--label-2);
 }

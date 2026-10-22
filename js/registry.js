@@ -202,7 +202,7 @@ export const games = [
     status: 'ready',
     keywords: ['dafuweng', 'fuweng', 'monopoly', 'richman', '地产'],
     cover: { colors: ['#ff7a6b', '#e3263f', '#7d0d27'], ink: '#5e0a1e', motif: 'monopoly' },
-    // 本机玩家赢电脑的局数（wins 每赢一局加一；几个人轮流玩、没有电脑的局不算）
+    // 赢的局数（wins 每赢一局加一）：联机赢了都算；本机对局要赢电脑才算，几个人轮流玩、没有电脑的局不算
     formatRecord: (records) => (records.wins ? `赢过 ${records.wins} 局` : ''),
     load: () => import('../games/monopoly/index.js'),
   },
@@ -214,7 +214,7 @@ export const games = [
     status: 'ready',
     keywords: ['feixingqi', 'feixing', 'ludo', 'aeroplane', '飞机'],
     cover: { colors: ['#fff3d6', '#ffcf9c', '#ff9f6e'], ink: '#9a3b12', motif: 'flight' },
-    // 本机玩家一共赢了几局（wins 每赢一局加一）
+    // 赢的局数（wins 每赢一局加一），和电脑玩、联机对战都算
     formatRecord: (records) => (records.wins ? `赢过 ${records.wins} 局` : ''),
     load: () => import('../games/feixingqi/index.js'),
   },

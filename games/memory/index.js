@@ -297,6 +297,7 @@ class Memory {
     this.records[scoreKey] = this.ctx.submitRecord(scoreKey, this.score);
     if (this.most) this.records[tilesKey] = this.ctx.submitRecord(tilesKey, this.most);
     this.record = previous === undefined ? 'first' : this.score > previous ? 'best' : null;
+    this.ctx.runEnded?.();
     this.build();
     this.updateChrome();
     this.save();
@@ -391,10 +392,14 @@ class Memory {
       overlay.hidden = true;
       return;
     }
-    const best = this.records[KEYS[this.mode][0]];
+    // 开局前写这个模式的最高分和全对过的最多格子数（全网榜单比的是格子数）
+    const [scoreKey, tilesKey] = KEYS[this.mode];
+    const best = this.records[scoreKey];
+    const most = this.records[tilesKey];
+    const bests = [best && `最高 ${best} 分`, most && `最多 ${most} 格`].filter(Boolean).join(' · ');
     const note = this.status === 'paused'
       ? `第 ${this.round + 1}/${ROUNDS} 回合 · ${this.score} 分`
-      : best ? `最高 ${best} 分` : `一局 ${ROUNDS} 回合`;
+      : bests || `一局 ${ROUNDS} 回合`;
     overlay.innerHTML = '<button class="mem-go"></button><p></p>';
     const go = overlay.querySelector('.mem-go');
     go.textContent = this.status === 'paused' ? '继续' : '开始';

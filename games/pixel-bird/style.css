@@ -37,6 +37,7 @@
 }
 
 .pbird-icon {
+  position: relative;
   display: grid;
   place-items: center;
   width: 36px;
@@ -48,6 +49,15 @@
   color: #fff;
   pointer-events: auto;
 }
+
+/* 圆按钮画 36px，点按范围往屏幕的角上扩到 44×44：只占按钮外面那圈 10px 的边，不往画面中间扩，免得吃掉扑翅膀的点按 */
+.pbird-icon::before {
+  content: "";
+  position: absolute;
+  inset: -8px 0 0 -8px;
+}
+
+.pbird-icon:last-child::before { inset: -8px -8px 0 0; }
 
 .pbird-icon svg { width: 20px; height: 20px; }
 .pbird-icon:active { opacity: 0.7; }

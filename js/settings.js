@@ -3,9 +3,11 @@
 import { games } from './registry.js';
 import { progress } from './store.js';
 import { resetPlayer } from './player.js';
-import { setBehind, toast } from './ui.js';
+import { NAME_MAX, nickname, setNickname } from './online.js';
+import { renameOnBoards } from './scores.js';
+import { esc, setBehind, toast } from './ui.js';
 
-export const VERSION = '0.7.1';
+export const VERSION = '0.8.0';
 
 const sheet = document.getElementById('settings');
 const body = sheet.querySelector('.sheet-body');
@@ -48,6 +50,12 @@ function render() {
     </div>
     ${standalone ? '' : '<p class="group-note">在 Safari 里点底部的“分享”按钮，选“添加到主屏幕”。之后从主屏幕打开，就是全屏、可以离线玩的 App。</p>'}
 
+    <p class="group-label">联机和榜单</p>
+    <div class="group">
+      <label class="cell"><span>昵称</span><input class="cell-input" data-name maxlength="${NAME_MAX}" value="${esc(nickname())}" enterkeyhint="done" autocomplete="off"></label>
+    </div>
+    <p class="group-note">联机对战和全网榜单上显示的名字。</p>
+
     <p class="group-label">数据</p>
     <div class="group">
       <button class="cell cell-danger" data-action="reset">清除所有存档和最高分</button>
@@ -68,6 +76,21 @@ body.addEventListener('click', (e) => {
   const button = e.target.closest('[data-action]');
   if (button?.dataset.action === 'reset') resetAll();
   else if (button?.dataset.action === 'check-update') checkUpdate(button);
+});
+
+// 昵称改完（失焦或按完成）就存下来，榜单上的名字也一起改
+body.addEventListener('change', (e) => {
+  if (!e.target.matches('[data-name]')) return;
+  const before = nickname();
+  e.target.value = setNickname(e.target.value);
+  if (e.target.value !== before) {
+    renameOnBoards(e.target.value);
+    toast('昵称已更新');
+  }
+});
+
+body.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.matches('[data-name]')) e.target.blur();
 });
 
 function resetAll() {

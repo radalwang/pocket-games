@@ -41,6 +41,10 @@
 .mono-seg button:active,
 .mono-foot button:active { opacity: 0.7; }
 
+/* 联机时发了动作、等服务器确认的那一下 */
+.mono-primary:disabled,
+.mono-secondary:disabled { opacity: 0.45; }
+
 /* ---------- 开局设置 ---------- */
 
 .mono-setup {
@@ -89,9 +93,8 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 
-.mono-seg.is-small { flex: none; width: 168px; }
+.mono-seg.is-small { flex: none; width: 120px; }
 .mono-seg.is-small button { height: 28px; font-size: 13px; }
-.mono-seg button.is-soon { color: var(--label-3); }
 
 .mono-seats {
   display: flex;
@@ -131,6 +134,7 @@
 }
 
 .mono-start { height: 48px; border-radius: 24px; font-size: 17px; }
+.mono-start + .mono-start { margin-top: -6px; } /* 开始游戏下面的「联机对战」 */
 
 /* ---------- 对局：玩家卡片、棋盘、记录、底部按钮 ---------- */
 
@@ -167,6 +171,23 @@
 .mono-player.is-winner { background: color-mix(in srgb, var(--c) 22%, var(--fill)); }
 .mono-player.is-out { opacity: 0.45; }
 .mono-player.is-out strong { text-decoration: line-through; }
+.mono-player.is-away { opacity: 0.6; } /* 联机掉线、电脑代打 */
+
+/* 联机时服务器正在给谁计时：卡片底下一条线，随剩下的时间缩短 */
+.mono-player.is-timed::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--c);
+  opacity: 0.7;
+  transform: scaleX(var(--left, 1));
+  transform-origin: left;
+  transition: transform 0.25s linear;
+}
 
 .mono-player-name {
   display: flex;
@@ -178,6 +199,14 @@
 }
 
 .mono-player-name .mono-dot { width: 8px; height: 8px; box-shadow: none; }
+
+/* 联机的昵称可能比较长，放不下就截成省略号 */
+.mono-player-name b {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: inherit;
+  text-overflow: ellipsis;
+}
 
 /* 四个人时卡片窄（iPhone SE 上只有 61px），字号跟着缩，¥99,999 也能整个放下；六位数加 is-long 再小一号 */
 .mono-player strong {
@@ -197,6 +226,13 @@
   color: var(--label-2);
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* “掉线 · 电脑代打”：四个人时卡片窄（iPhone SE 上），中间那段省掉，只写“掉线代打” */
+.mono-player small i { font-style: normal; }
+
+@container (max-width: 72px) {
+  .mono-player small i { display: none; }
 }
 
 /* 钱变了：卡片右上角飘一个数字 */
@@ -398,6 +434,17 @@
 
 .mono-wait { animation: mono-breathe 1.4s ease-in-out infinite; }
 
+/* 联机限时：自己的回合在按钮下面写还剩几秒，快到了变红 */
+.mono-clock {
+  flex-basis: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+}
+
+.mono-clock.is-urgent { color: var(--danger); }
+
 @keyframes mono-breathe {
   50% { opacity: 0.5; }
 }
@@ -578,3 +625,19 @@
 .mono-sheet-card dd { margin: 0; font-variant-numeric: tabular-nums; }
 
 .mono-sheet-now { font-size: 14px; }
+
+/* ---------- 联机大厅、连接提示：盖住整个游戏，卡片（样式在 app.css 的 .lobby）居中，后面的画面虚化 ---------- */
+
+.mono-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  animation: mono-fade 0.2s ease both;
+}

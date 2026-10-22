@@ -4,6 +4,7 @@ import { changes, prefs } from './store.js';
 import { icon } from './icons.js';
 import { renderHome } from './views/home.js';
 import { renderLibrary } from './views/library.js';
+import { mountLeaderboard, refreshLeaderboard, showBoard, updateLeaderboard } from './views/leaderboard.js';
 import { mountSearch, updateSearch } from './views/search.js';
 import { isPlayerOpen, openGame, updateMini } from './player.js';
 import { openSettings, VERSION } from './settings.js';
@@ -23,6 +24,7 @@ function refresh() {
   stale = false;
   renderHome(bodyOf('home'));
   renderLibrary(bodyOf('library'));
+  updateLeaderboard();
   updateSearch();
 }
 
@@ -39,6 +41,8 @@ function selectTab(name, { initial = false } = {}) {
     tab.setAttribute('aria-selected', String(active));
   }
   prefs.set('tab', view.dataset.view);
+  // 榜单每次切过来都重新取一次
+  if (view === views.leaderboard) refreshLeaderboard();
 }
 
 document.addEventListener('click', (e) => {
@@ -67,7 +71,17 @@ document.addEventListener('player:closed', () => {
   if (stale) refresh();
 });
 
+// 存储空间满了：这次打开期间进度还在，但关掉 App 就没了
+changes.addEventListener('full', () => toast('存档空间满了，这次的进度可能没能存下来'));
+
+// 游戏页里点「新纪录！」（游戏页已经收起）：切到榜单页，看那个游戏的那个榜
+document.addEventListener('leaderboard:show', (e) => {
+  showBoard(e.detail?.game, e.detail?.key);
+  selectTab('leaderboard');
+});
+
 mountSearch(bodyOf('search'));
+mountLeaderboard(bodyOf('leaderboard'));
 refresh();
 selectTab(prefs.get('tab', 'home'), { initial: true });
 updateMini();

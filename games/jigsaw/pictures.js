@@ -547,7 +547,8 @@ export function renderPicture(id, width) {
   return canvas;
 }
 
-// 照片：从中间裁成 3:4，缩到 750×1000 以内，存成 JPEG 的 data URL（大约一两百 KB）
+// 照片：从中间裁成 3:4，缩到 600×800 以内，存成 JPEG 的 data URL（一般一百多 KB）。
+// 照片要整个存进存档，越小越好；iPhone SE 上画板大约 224×298，2 倍屏要 448×596 像素，600×800 还留了点余量
 export async function loadPhoto(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -556,10 +557,13 @@ export async function loadPhoto(file) {
     const cropW = scale * 3;
     const cropH = scale * 4;
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(Math.min(750, cropW));
+    canvas.width = Math.round(Math.min(600, cropW));
     canvas.height = Math.round((canvas.width * 4) / 3);
-    canvas.getContext('2d').drawImage(image, (image.naturalWidth - cropW) / 2, (image.naturalHeight - cropH) / 2, cropW, cropH, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.82);
+    const g = canvas.getContext('2d');
+    // 手机照片要缩小五六倍，用好一点的缩放，免得细节处出锯齿
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(image, (image.naturalWidth - cropW) / 2, (image.naturalHeight - cropH) / 2, cropW, cropH, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.8);
   } finally {
     URL.revokeObjectURL(url);
   }

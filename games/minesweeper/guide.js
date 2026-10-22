@@ -2,6 +2,7 @@
 
 const FONT = 'font-family="ui-rounded, -apple-system, system-ui, sans-serif" font-weight="800" text-anchor="middle" dominant-baseline="central"';
 const HIDDEN = '#5ccfae';
+const POLE = '#1c1c1e'; // 旗杆和底座用深色，白色在薄荷绿上看不清
 const NUMBER = { 1: '#2f8cff', 2: '#2fa84f', 3: '#ff453a' };
 
 const svg = (body) => `<svg viewBox="0 0 300 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
@@ -14,9 +15,9 @@ function cell(x, y, size, kind) {
     let out = `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${rx}" fill="${HIDDEN}"/>`;
     if (kind === 'F') {
       const px = x + size * 0.36;
-      out += `<rect x="${px}" y="${y + size * 0.2}" width="${size * 0.08}" height="${size * 0.58}" rx="${size * 0.04}" fill="#fff"/>`
+      out += `<rect x="${px}" y="${y + size * 0.2}" width="${size * 0.08}" height="${size * 0.58}" rx="${size * 0.04}" fill="${POLE}"/>`
         + `<path d="M${px + size * 0.08} ${y + size * 0.2}L${x + size * 0.8} ${y + size * 0.36}L${px + size * 0.08} ${y + size * 0.52}Z" fill="#ff3b30"/>`
-        + `<rect x="${x + size * 0.22}" y="${y + size * 0.74}" width="${size * 0.36}" height="${size * 0.1}" rx="${size * 0.05}" fill="#fff"/>`;
+        + `<rect x="${x + size * 0.22}" y="${y + size * 0.74}" width="${size * 0.36}" height="${size * 0.1}" rx="${size * 0.05}" fill="${POLE}"/>`;
     }
     return out;
   }

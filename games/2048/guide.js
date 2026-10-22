@@ -59,7 +59,7 @@ export default [
       + '<path d="M214 105l6-6M218 122h8M192 99v-8" fill="none" stroke="#ff2d6f" stroke-width="2.5" stroke-linecap="round"/>'),
   },
   {
-    title: '凑出 2048',
+    title: '凑出2048',
     text: '凑出 2048 就赢了，还可以接着挑战更大的数字。最高分会一直记着。',
     art: svg('<circle cx="110" cy="85" r="54" fill="#5e5ce6" fill-opacity=".18"/>'
       + tile(75, 50, 70, 2048)

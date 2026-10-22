@@ -546,12 +546,16 @@ class Game {
     this.setTheme(0);
     this.hideOverlay();
     this.updateHud();
+    this.wake();
   }
 
   start() {
     this.state = 'playing';
     this.score = 0;
     this.bestBefore = this.best;
+    // 告诉外壳新开了一局（开始、重新开始、再来一局都从这里起飞，读档接着飞的不走这里）：
+    // 上一局放弃之前破的纪录，不算到这一局头上
+    this.ctx.runStarted?.();
     this.pipes = [];
     this.lastGapY = null;
     this.nextPipeAt = Math.round(this.dist) + this.W + 8;
@@ -628,6 +632,7 @@ class Game {
     this.state = 'countdown';
     this.countdown = COUNTDOWN;
     this.updateHud();
+    this.wake();
   }
 
   // 从悬停开始接着飞，不沿用暂停前的下落速度，不然暂停时正往下掉，倒数一完就撞地，根本来不及点
@@ -684,12 +689,23 @@ class Game {
   // ---------- 每一帧 ----------
 
   setLoop(on) {
+    this.looping = on;
     cancelAnimationFrame(this.raf);
     this.raf = 0;
-    if (!on) return;
+    this.wake();
+  }
+
+  // 停在暂停、结算面板上时画面不动，画完最后一帧循环就歇着（见 frame），接着玩时从这里叫醒
+  wake() {
+    if (!this.looping || this.raf) return;
     this.lastFrame = performance.now();
     this.acc = 0;
     this.raf = requestAnimationFrame(this.frame);
+  }
+
+  // 停在面板上，换主题的渐变、撞上时的闪白和抖动也都播完了，之后每一帧都一模一样，不用再画
+  isStill() {
+    return (this.state === 'paused' || this.state === 'over') && this.themeT >= 1 && this.flash <= 0 && this.shake <= 0;
   }
 
   frame(now) {
@@ -703,6 +719,10 @@ class Game {
     for (let i = 0; i < steps; i++) this.update(STEP);
     this.acc -= steps * STEP;
     this.draw();
+    if (this.isStill()) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    }
   }
 
   update(dt) {
@@ -812,6 +832,8 @@ class Game {
     this.last = this.score;
     this.updateHud();
     this.save();
+    // 撞上就算这一局结束，不等结算面板：小鸟还在往下掉时换了游戏或关掉 App，面板就不会出来了
+    this.ctx.runEnded?.();
   }
 
   // 撞上以后小鸟头朝下掉到地上，停一会儿再出结算面板

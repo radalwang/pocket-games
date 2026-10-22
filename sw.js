@@ -1,7 +1,7 @@
 // 离线缓存：第一次打开时把所有文件存到手机上，之后没有网络也能打开。
 // 发布新版本时改一下 VERSION，手机下次联网打开时会换成新文件。
 // 新增文件（比如新游戏）时，记得把路径加进 ASSETS。
-const VERSION = 'v0.7.1';
+const VERSION = 'v0.8.0';
 const CACHE = `pocket-games-${VERSION}`;
 const ASSETS = [
   './',
@@ -9,14 +9,19 @@ const ASSETS = [
   'manifest.webmanifest',
   'css/app.css',
   'js/app.js',
+  'js/boards.js',
   'js/covers.js',
   'js/icons.js',
+  'js/lobby.js',
+  'js/online.js',
   'js/player.js',
   'js/registry.js',
+  'js/scores.js',
   'js/settings.js',
   'js/store.js',
   'js/ui.js',
   'js/views/home.js',
+  'js/views/leaderboard.js',
   'js/views/library.js',
   'js/views/parts.js',
   'js/views/search.js',

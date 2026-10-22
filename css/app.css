@@ -915,6 +915,24 @@ svg { display: block; }
 .cell-value { color: var(--label-2); }
 .cell-danger { color: var(--danger); }
 .cell-action { color: var(--accent); }
+
+.cell-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--label-2);
+  font: inherit;
+  text-align: right;
+  -webkit-appearance: none;
+  appearance: none;
+  /* 整页关了文字选择，输入框要单独打开，不然 iOS 上可能没法打字 */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.cell-input:focus { color: var(--label); }
 .cell-action:disabled { color: var(--label-2); }
 
 .group-note {
@@ -923,6 +941,610 @@ svg { display: block; }
   line-height: 1.4;
   color: var(--label-2);
 }
+
+/* ---------- 破纪录的庆祝条（游戏页顶部，js/player.js） ---------- */
+
+.cheer {
+  position: absolute;
+  top: calc(var(--safe-top) + 62px);
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 32px);
+  padding: 8px 18px 8px 8px;
+  border-radius: 999px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
+  border: 0.5px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+  text-align: left;
+  opacity: 0;
+  transform: translate(-50%, -16px) scale(0.92);
+  transition: opacity 0.25s, transform 0.45s var(--ease);
+}
+
+.cheer.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.cheer-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd66b, #f5a524);
+  color: #fff;
+}
+
+.cheer-icon svg { width: 22px; height: 22px; }
+
+.cheer-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cheer-title {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.cheer-detail {
+  overflow: hidden;
+  color: var(--label-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 联机大厅（js/lobby.js，飞行棋和大富翁共用） ---------- */
+
+.lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: min(100%, 330px);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 20px 18px 16px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  overscroll-behavior: contain;
+}
+
+.lobby h3 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.lobby input {
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--label);
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  /* 整页关了文字选择，输入框要单独打开，不然 iOS 上可能没法打字 */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.lobby p {
+  margin-top: -6px;
+  color: var(--label-2);
+  font-size: 15px;
+}
+
+.lobby .lobby-note {
+  margin-top: -6px;
+  font-size: 13px;
+}
+
+.lobby-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.lobby-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--fill-2);
+  border-top-color: var(--label-2);
+  border-radius: 50%;
+  animation: lobby-spin 0.8s linear infinite;
+}
+
+@keyframes lobby-spin {
+  to { transform: rotate(360deg); }
+}
+
+.lobby-btn {
+  height: 46px;
+  border-radius: 14px;
+  background: var(--fill);
+  font-size: 16px;
+  font-weight: 700;
+  transition: transform 0.15s, opacity 0.2s;
+}
+
+.lobby-btn:active { transform: scale(0.97); }
+.lobby-btn.is-primary { background: var(--accent); color: #fff; }
+.lobby-btn:disabled { opacity: 0.45; transform: none; }
+
+.lobby-row {
+  display: flex;
+  gap: 10px;
+}
+
+.lobby-row > * { flex: 1; }
+
+.lobby-link {
+  align-self: center;
+  padding: 4px 12px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.lobby-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 15px;
+}
+
+.lobby-name span {
+  color: var(--label-2);
+  font-weight: 600;
+}
+
+.lobby-name input {
+  flex: 1;
+  min-width: 0;
+  /* 16px 以下的输入框 iOS 一聚焦就会放大整个页面 */
+  font-size: 16px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.lobby-seats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.lobby-seats li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--fill);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.lobby-seats li span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-seats li.is-empty {
+  background: none;
+  border: 1.5px dashed var(--separator);
+  color: var(--label-3);
+  font-weight: 500;
+}
+
+.lobby-seats em {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--fill-2);
+  color: var(--label-2);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.lobby .lobby-code {
+  margin: -8px 0 0;
+  color: var(--label);
+  font-size: 44px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+}
+
+.lobby-code-input {
+  height: 64px;
+  border-radius: 14px;
+  background: var(--fill);
+  font-size: 34px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-align: center;
+}
+
+.lobby-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.lobby-field > span {
+  color: var(--label-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lobby-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.lobby-seg button {
+  flex: 1;
+  height: 32px;
+  text-align: center;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.lobby-seg button.is-active {
+  background: var(--cell);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- 榜单页 ---------- */
+
+/* 自己那一行固定在标签栏（和继续游戏条）上方，页面底部只留到它为止 */
+.view[data-view="leaderboard"] { padding-bottom: calc(var(--dock-gap) + var(--tabbar-h) + 10px); }
+.app.has-mini .view[data-view="leaderboard"] { padding-bottom: calc(var(--dock-gap) + var(--tabbar-h) + var(--mini-h) + 18px); }
+
+/* 榜单不满一屏时，也把自己那一行推到底部 */
+.lb {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100% - 44px - var(--safe-top));
+}
+
+.lb-games,
+.lb-pills {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  gap: 8px;
+  padding: 0 20px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 20px;
+  scrollbar-width: none;
+}
+
+.lb-games::-webkit-scrollbar,
+.lb-pills::-webkit-scrollbar { display: none; }
+
+.lb-game {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px 0 5px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.lb-game.is-active { background: var(--accent); color: #fff; }
+
+.lb-thumb {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.lb-thumb .cover { width: 100%; height: 100%; }
+
+.lb-boards { margin-top: 12px; }
+.lb-boards:empty { display: none; }
+
+.lb-seg {
+  display: flex;
+  gap: 2px;
+  margin: 0 20px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.lb-seg button {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  overflow: hidden;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.lb-seg .is-active {
+  background: var(--cell);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.lb-pills button {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.lb-pills .is-active { background: var(--label); color: var(--bg); }
+
+.lb-main {
+  flex: 1;
+  padding-bottom: 12px;
+}
+
+.lb-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 20px 20px 4px;
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.lb-link {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.lb-list {
+  margin: 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.lb-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 8px;
+  border-radius: 12px;
+}
+
+/* 分隔线从名字下面开始；自己那一行有底色，上下都不画 */
+.lb-row + .lb-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 8px auto 52px;
+  height: 0.5px;
+  background: var(--separator);
+}
+
+.lb-row.is-me::before,
+.lb-row.is-me + .lb-row::before { display: none; }
+
+.lb-row.is-me { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+.lb-rank {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  margin-right: 4px;
+  padding: 0 4px;
+  border-radius: 16px;
+  color: var(--label-2);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 底部自己那一行的名次牌大一点，不是前三名时也有底色 */
+.lb-me .lb-rank {
+  min-width: 40px;
+  height: 40px;
+  margin-right: 0;
+  border-radius: 20px;
+  background: var(--fill-2);
+  color: var(--label);
+  font-size: 16px;
+}
+
+.lb-me .lb-rank svg {
+  width: 20px;
+  height: 20px;
+  color: var(--label-2);
+}
+
+/* 前三名：金、银、铜色的圆牌，带一点高光 */
+.lb-rank.is-gold,
+.lb-rank.is-silver,
+.lb-rank.is-bronze {
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.lb-rank.is-gold { background: linear-gradient(145deg, #ffd96a, #eba416); }
+.lb-rank.is-silver { background: linear-gradient(145deg, #dde2e8, #9aa2ad); }
+.lb-rank.is-bronze { background: linear-gradient(145deg, #efb88a, #bf733e); }
+
+.lb-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-tag {
+  flex: none;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lb-value {
+  flex: none;
+  margin-left: auto;
+  padding-left: 4px;
+  color: var(--label-2);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-row.is-me .lb-value { color: var(--label); }
+
+.lb-spinner {
+  width: 28px;
+  height: 28px;
+  margin: 72px auto;
+  border: 3px solid var(--fill-2);
+  border-top-color: var(--label-2);
+  border-radius: 50%;
+  animation: lb-spin 0.8s linear infinite;
+}
+
+@keyframes lb-spin {
+  to { transform: rotate(360deg); }
+}
+
+.lb-retry {
+  margin-top: 18px;
+  height: 36px;
+  padding: 0 22px;
+  border-radius: 18px;
+  background: var(--fill);
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* 吸底的位置是从滚动区域的内边距往上算的：上面 .view 的 padding-bottom 已经让出了标签栏和继续条，这里 bottom 写 0 就行 */
+.lb-pin {
+  position: sticky;
+  bottom: 0;
+  /* 盖在底部标签栏的渐隐上面，不然下半截会被冲淡 */
+  z-index: 21;
+  margin: 0 16px;
+}
+
+.lb-me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 16px 8px 10px;
+  border-radius: 30px;
+  text-align: left;
+  transition: transform 0.25s var(--ease);
+}
+
+button.lb-me:active { transform: scale(0.98); }
+
+.lb-me-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lb-me-title,
+.lb-me-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-me-title { font-size: 15px; font-weight: 600; }
+.lb-me-sub { font-size: 13px; color: var(--label-2); }
+
+.lb-me-note {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.lb-me-value {
+  flex: none;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+
+.lb-go svg { width: 14px; height: 14px; }
 
 /* ---------- 提示 ---------- */
 

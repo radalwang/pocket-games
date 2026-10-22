@@ -1,16 +1,19 @@
-// 一局对战：把「局面怎么变」（rules.js）和「下一步从哪来、点数谁来掷、怎么同步给别的设备」分开，以后接联机只动这里。
+// 一局对战：把「局面怎么变」（rules.js）和「下一步从哪来、点数谁来掷、怎么同步给别的设备」分开，联机只动这里。
 //
 // - config 是开局设置，开局后不变；log 是按顺序记下的每一步动作。同样的 config + log 在任何设备上
 //   重放都得到同样的局面（rules.js 不用随机数），存档存的就是这两样，联机时各设备之间也只交换这两样。
 // - seats 是这台设备眼里每一方由谁来下，和 config.players 一一对应：'local' 等本机的人点，
-//   'ai' 由本机算（ai.js），'remote' 等别的设备发来（联机以后做）。同一局在你的手机上你是 local、对方是 remote，
+//   'ai' 由本机算（ai.js），'remote' 等别的设备或服务器发来。同一局在你的手机上你是 local、对方是 remote，
 //   在对方手机上正好反过来，所以 seats 只存在本机，不放进 config，也不通过联机发出去。
-// - 掷骰子的点数由掷的那一方用 dice() 生成，写进 roll 动作里。以后要防作弊，可以改成房主或服务器统一给点数，
-//   动作格式不用变。
-// - link 是联机通道，要有 send(message) 和 onMessage(handler) 两个方法，现在不传就是单机。
+// - 掷骰子的点数由掷的那一方用 dice() 生成，写进 roll 动作里；联机对战时由服务器统一给点数（见下面的 server），
+//   动作格式一样。
+// - link 是设备之间直接联机的通道，要有 send(message) 和 onMessage(handler) 两个方法，不传就是单机。
 //   本机走的每一步都会用 action 消息发出去；收到的消息交给 receive()，验证合法后和本机的动作走同一条路。
+// - server 是联机对战（服务器说了算，见 server/PROTOCOL.md）用的：传一个 send(intent) 函数。这时本机的人掷骰子、
+//   走飞机都不自己走，只把意图交给它发给服务器；服务器掷好点数、确认合法后广播给所有人，再由 accept(seq, action)
+//   执行。所有座位（包括自己）的动作都走 accept，所以本机的 log 和服务器的一模一样。电脑由服务器替它走，本机看来是 remote。
 
-import { apply, checkConfig, createGame, replay, RULES_VERSION, RuleError } from './rules.js';
+import { apply, checkConfig, createGame, legalPlanes, replay, RULES_VERSION, RuleError } from './rules.js';
 
 export const KINDS = ['local', 'ai', 'remote'];
 
@@ -47,7 +50,7 @@ export function newSetup({ players, planes, first = Math.floor(Math.random() * p
 }
 
 export class Match {
-  constructor({ config, seats, log = [], dice = randomDie, link = null }) {
+  constructor({ config, seats, log = [], dice = randomDie, link = null, server = null }) {
     checkConfig(config);
     if (!Array.isArray(seats) || seats.length !== config.players.length || !seats.every((kind) => KINDS.includes(kind))) {
       throw new RuleError('座位设置不对');
@@ -59,6 +62,8 @@ export class Match {
     this.dice = dice;
     this.listeners = new Set();
     for (const action of log) this.commit(action, { quiet: true });
+    this.server = server;
+    this.pending = false; // 联机对战：意图已经发给服务器，还没等到它广播回来
     this.link = link;
     link?.onMessage((message) => this.receive(message));
   }
@@ -68,13 +73,42 @@ export class Match {
     return this.seats[this.state.turn];
   }
 
-  // 本机替当前这一方掷骰子 / 走飞机。动作不合法会抛 RuleError
+  // 本机替当前这一方掷骰子 / 走飞机。动作不合法会抛 RuleError。
+  // 联机对战时只把意图发给服务器，发出去了返回 true（不返回事件，动画等服务器广播回来再放）
   roll() {
+    if (this.server) return this.request({ type: 'roll' });
     return this.commit({ type: 'roll', seat: this.state.turn, value: this.dice() });
   }
 
   move(plane) {
+    if (this.server) {
+      if (this.state.phase !== 'move' || !legalPlanes(this.state).includes(plane)) throw new RuleError('这架飞机不能走');
+      return this.request({ type: 'move', plane });
+    }
     return this.commit({ type: 'move', seat: this.state.turn, plane });
+  }
+
+  // 联机对战：轮到本机的人时把意图发给服务器。等到广播之前不再发第二次（防连点），这时返回 false
+  request(intent) {
+    if (this.pending || this.kind !== 'local' || this.state.phase === 'over') return false;
+    this.pending = true;
+    this.server(intent);
+    return true;
+  }
+
+  // 联机对战：服务器广播的第 seq 步动作。正好接得上就执行，返回 true；早就执行过的（重复收到）返回 false；
+  // 跳了号或者执行不了，说明和服务器对不上了，抛 RuleError，这时该向服务器整局重要一次
+  accept(seq, action) {
+    if (seq < this.log.length) return false;
+    if (seq > this.log.length) throw new RuleError('漏收了动作，和服务器对不上');
+    this.pending = false;
+    this.commit(action, { remote: true });
+    return true;
+  }
+
+  // 联机对战：服务器没接受刚才的意图（比如刚好超时，它已经替你走了），可以再点
+  reject() {
+    this.pending = false;
   }
 
   // 做一步动作：算出新局面、记进 log、通知界面；本机产生的动作同时发给联机的对方

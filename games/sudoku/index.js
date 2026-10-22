@@ -29,7 +29,7 @@ const TEMPLATE = `
     </div>
     <div class="sd-top">
       <div class="sd-stat" data-ref="mistakesStat"><span>错误</span><strong data-ref="mistakes">0</strong></div>
-      <div class="sd-stat"><span>用时</span><strong data-ref="time">0:00</strong></div>
+      <div class="sd-stat sd-timer"><div class="sd-time"><span>用时</span><strong data-ref="time">0:00</strong></div><small data-ref="best"></small></div>
       <button class="sd-new" data-ref="newGame">${RESTART}新游戏</button>
     </div>
     <div class="sd-stage"><div class="sd-board" data-ref="board"></div></div>
@@ -150,13 +150,23 @@ class Sudoku {
 
   chooseLevel(level) {
     if (level === this.level && this.status === 'playing') return;
-    if (this.started && !window.confirm('换难度会放弃这一局，确定吗？')) return;
+    if (!this.confirmAbandon('换难度会放弃这一局，确定吗？')) return;
     this.newGame(level);
   }
 
   requestNewGame() {
-    if (this.started && !window.confirm('重新开始会放弃这一局，确定吗？')) return;
+    if (!this.confirmAbandon('重新开始会放弃这一局，确定吗？')) return;
     this.newGame();
+  }
+
+  // 动过的局先停表再弹确认框，点取消接着计时，犹豫的这几秒不算进用时
+  confirmAbandon(message) {
+    if (!this.started) return true;
+    const wasRunning = Boolean(this.runningSince);
+    this.stopClock();
+    const ok = window.confirm(message);
+    if (!ok && wasRunning) this.startClock();
+    return ok;
   }
 
   newGame(level = this.level) {
@@ -367,6 +377,8 @@ class Sudoku {
     this.records[this.level] = this.ctx.submitRecord(this.level, time, { lowerIsBetter: true });
     this.record = previous === undefined ? 'first' : time < previous ? 'best' : null;
     for (let i = 0; i < 81; i++) this.animate(i, 'wave', (rowOf(i) + colOf(i)) * 35);
+    // 告诉外壳这一局结束了，破了纪录的话外壳会弹出「新纪录！」
+    this.ctx.runEnded?.();
   }
 
   // ---------- 操作 ----------
@@ -488,7 +500,7 @@ class Sudoku {
   }
 
   updateChrome() {
-    const { levels, pad, undo, erase, notes, notesBadge, hint, hintBadge, bottom, result, resultText, board } = this.refs;
+    const { levels, pad, undo, erase, notes, notesBadge, hint, hintBadge, bottom, result, resultText, best, board } = this.refs;
     const playing = this.status === 'playing';
     const sel = this.selected;
     for (const button of levels.children) button.classList.toggle('is-active', button.dataset.level === this.level);
@@ -496,6 +508,10 @@ class Sudoku {
     this.refs.mistakes.textContent = this.mistakes;
     this.refs.mistakesStat.classList.toggle('has-mistakes', this.mistakes > 0);
     this.renderTime();
+    // 用时下面写着这个难度的最快用时，还没通关过就不写
+    const fastest = this.records[this.level];
+    best.hidden = !fastest;
+    best.textContent = fastest ? `最快 ${clock(fastest)}` : '';
 
     for (const button of pad.children) {
       const left = 9 - this.placed(Number(button.dataset.digit));

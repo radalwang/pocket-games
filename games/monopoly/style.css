@@ -1,0 +1,580 @@
+/* 大富翁的样式，只作用在 .mono 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.mono {
+  --mono-board: #e3e3e9;
+  --mono-tile: #fff;
+  --mono-corner: #f2f2f7;
+  --mono-seg-on: #fff;
+  position: relative;
+  height: 100%;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: manipulation;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mono {
+    --mono-board: #1c1c1e;
+    --mono-tile: #2c2c2e;
+    --mono-corner: #3a3a3c;
+    --mono-seg-on: #636366;
+  }
+}
+
+.mono [hidden] { display: none !important; }
+
+.mono-primary,
+.mono-secondary {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.mono-primary { background: var(--accent); color: #fff; }
+.mono-secondary { background: var(--fill-2); }
+
+.mono-primary:active,
+.mono-secondary:active,
+.mono-seg button:active,
+.mono-foot button:active { opacity: 0.7; }
+
+/* ---------- 开局设置 ---------- */
+
+.mono-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(100%, 440px);
+  height: 100%;
+  margin: 0 auto;
+  padding: 8px 20px 20px;
+  overflow-y: auto;
+}
+
+.mono-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mono-field > span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.mono-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.mono-seg button {
+  flex: 1;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.mono-seg button.is-active {
+  background: var(--mono-seg-on);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+.mono-seg.is-small { flex: none; width: 168px; }
+.mono-seg.is-small button { height: 28px; font-size: 13px; }
+.mono-seg button.is-soon { color: var(--label-3); }
+
+.mono-seats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mono-seat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.mono-seat strong {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.mono-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.mono-note {
+  min-height: 2.6em;
+  font-size: 13px;
+  color: var(--label-2);
+  text-wrap: balance;
+}
+
+.mono-start { height: 48px; border-radius: 24px; font-size: 17px; }
+
+/* ---------- 对局：玩家卡片、棋盘、记录、底部按钮 ---------- */
+
+.mono-game {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 2px 12px 12px;
+}
+
+.mono-game > * { flex: none; }
+
+.mono-players {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 6px;
+}
+
+.mono-player {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--fill);
+  transition: box-shadow 0.25s, background-color 0.25s, opacity 0.25s;
+  container-type: inline-size; /* 钱数的字号按卡片宽度算 */
+}
+
+.mono-player.is-turn { box-shadow: inset 0 0 0 2px var(--c); }
+.mono-player.is-winner { background: color-mix(in srgb, var(--c) 22%, var(--fill)); }
+.mono-player.is-out { opacity: 0.45; }
+.mono-player.is-out strong { text-decoration: line-through; }
+
+.mono-player-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mono-player-name .mono-dot { width: 8px; height: 8px; box-shadow: none; }
+
+/* 四个人时卡片窄（iPhone SE 上只有 61px），字号跟着缩，¥99,999 也能整个放下；六位数加 is-long 再小一号 */
+.mono-player strong {
+  overflow: hidden;
+  font-size: min(15px, 21.5cqw);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mono-player strong.is-long { font-size: min(15px, 18.5cqw); }
+
+.mono-player small {
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--label-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 钱变了：卡片右上角飘一个数字 */
+.mono-delta {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--danger);
+  pointer-events: none;
+  animation: mono-float 1.1s ease-out forwards;
+}
+
+.mono-delta.is-gain { color: #30b350; }
+
+@keyframes mono-float {
+  0% { opacity: 0; transform: translateY(6px); }
+  15% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+
+.mono-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+/* 8×8 的一圈格子，中间 6×6 放骰子和按钮。格子里的字按棋盘大小缩放 */
+.mono-board {
+  position: relative;
+  display: grid;
+  grid-template: repeat(8, minmax(0, 1fr)) / repeat(8, minmax(0, 1fr));
+  gap: 0.5cqmin;
+  width: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+  padding: 0.6cqmin;
+  border-radius: 3cqmin;
+  background: var(--mono-board);
+  container-type: inline-size;
+}
+
+.mono-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3cqw;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 1.4cqw;
+  background: var(--mono-tile);
+  text-align: center;
+  line-height: 1.1;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.mono-tile:active { filter: brightness(0.94); }
+
+/* iPhone SE 上棋盘约 311px 宽：地名约 9.5px，价钱约 8px */
+.mono-name {
+  font-size: 3.1cqw;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mono-sub {
+  font-size: 2.65cqw;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+  white-space: nowrap;
+}
+
+.mono-glyph {
+  font-size: 4.2cqw;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mono-tile.t-chance .mono-glyph { color: #ff9f0a; }
+.mono-tile.t-fate .mono-glyph { color: #5e5ce6; }
+
+/* 色带贴着朝棋盘中间的那条边 */
+.mono-band {
+  position: absolute;
+  background: var(--g);
+}
+
+.mono-tile.s-b .mono-band { inset: 0 0 auto; height: 15%; }
+.mono-tile.s-t .mono-band { inset: auto 0 0; height: 15%; }
+.mono-tile.s-l .mono-band { inset: 0 0 0 auto; width: 15%; }
+.mono-tile.s-r .mono-band { inset: 0 auto 0 0; width: 15%; }
+
+/* 左右两边的地：字在色带以外的地方居中，免得压到色带 */
+.mono-tile.t-city.s-l { padding-right: 15%; }
+.mono-tile.t-city.s-r { padding-left: 15%; }
+
+/* 有主的地：底色染成地主的颜色，再描一圈 */
+.mono-tile.is-owned {
+  background: color-mix(in srgb, var(--own) 20%, var(--mono-tile));
+  box-shadow: inset 0 0 0 0.5cqw var(--own);
+}
+
+.mono-tile.is-owned .mono-sub { color: var(--own); letter-spacing: -0.1em; }
+
+.mono-tile.t-start,
+.mono-tile.t-jail,
+.mono-tile.t-park,
+.mono-tile.t-gotojail { background: var(--mono-corner); }
+
+.mono-tile.t-start .mono-name { color: var(--accent); }
+
+/* ---------- 棋盘中间：轮到谁、骰子、消息、按钮 ---------- */
+
+.mono-center {
+  position: relative;
+  grid-area: 2 / 2 / 8 / 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4cqw;
+  min-height: 0;
+  padding: 2cqw;
+  text-align: center;
+}
+
+.mono-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6cqw;
+  font-size: 4cqw;
+  font-weight: 700;
+}
+
+.mono-turn small {
+  font-size: 2.8cqw;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.mono-dice {
+  display: flex;
+  gap: 2.4cqw;
+}
+
+.mono-die {
+  width: 10cqw;
+  aspect-ratio: 1;
+  border-radius: 2.2cqw;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 -2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.mono-die svg { display: block; width: 100%; height: 100%; fill: #1c1c1e; }
+.mono-dice.is-idle .mono-die { opacity: 0.45; }
+.mono-dice.is-rolling .mono-die { animation: mono-shake 0.14s linear infinite; }
+.mono-dice.is-rolling .mono-die + .mono-die { animation-direction: reverse; }
+
+@keyframes mono-shake {
+  0% { transform: rotate(-12deg) translateY(-2px); }
+  50% { transform: rotate(12deg) translateY(2px); }
+  100% { transform: rotate(-12deg) translateY(-2px); }
+}
+
+.mono-msg {
+  display: -webkit-box;
+  min-height: 2.5em;
+  overflow: hidden;
+  font-size: 3.4cqw;
+  font-weight: 600;
+  line-height: 1.25;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-wrap: balance;
+}
+
+.mono-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.mono-ask,
+.mono-wait {
+  flex-basis: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.mono-wait { animation: mono-breathe 1.4s ease-in-out infinite; }
+
+@keyframes mono-breathe {
+  50% { opacity: 0.5; }
+}
+
+/* 抽到的机会、命运卡：在棋盘中间弹出来 */
+.mono-card {
+  position: absolute;
+  inset: 12%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqw;
+  padding: 4cqw;
+  border-radius: 3cqw;
+  background: var(--bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), inset 0 0 0 1.2cqw var(--deck);
+  animation: mono-flip 0.4s var(--ease) both;
+}
+
+.mono-card.is-chance { --deck: #ff9f0a; }
+.mono-card.is-fate { --deck: #5e5ce6; }
+
+.mono-card small {
+  font-size: 3.4cqw;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  color: var(--deck);
+}
+
+.mono-card p {
+  font-size: 4cqw;
+  font-weight: 700;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+@keyframes mono-flip {
+  from { opacity: 0; transform: perspective(600px) rotateY(80deg) scale(0.9); }
+}
+
+/* ---------- 棋子：位置由 --x、--y 决定（以格子为单位），改了就滑过去 ---------- */
+
+.mono-tokens {
+  position: absolute;
+  inset: 0.6cqmin;
+  pointer-events: none;
+}
+
+.mono-token {
+  position: absolute;
+  left: calc(var(--x, 0) * 12.5%);
+  top: calc(var(--y, 0) * 12.5%);
+  width: 4.4cqw;
+  height: 4.4cqw;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 0.5cqw #fff, 0 2px 5px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  transition: left 0.13s linear, top 0.13s linear, transform 0.25s;
+}
+
+.mono-token.is-turn {
+  z-index: 2;
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+.mono-token.is-jump { transition: left 0.5s var(--ease), top 0.5s var(--ease), transform 0.25s; }
+
+/* ---------- 记录和底部按钮 ---------- */
+
+.mono-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 4.4em;
+  margin: 0;
+  padding: 0 4px;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.1;
+  color: var(--label-2);
+}
+
+.mono-log li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mono-log li:nth-child(n + 3) { opacity: 0.6; }
+
+.mono-foot {
+  display: flex;
+  gap: 10px;
+}
+
+.mono-foot button {
+  flex: 1;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.mono-foot button:disabled { opacity: 0.35; cursor: default; }
+
+/* ---------- 点一格看详情 ---------- */
+
+.mono-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  animation: mono-fade 0.2s ease both;
+}
+
+@keyframes mono-fade {
+  from { opacity: 0; }
+}
+
+.mono-sheet-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(100%, 400px);
+  padding: 16px;
+  border-radius: 22px;
+  background: var(--bg);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+  animation: mono-rise 0.3s var(--ease) both;
+}
+
+@keyframes mono-rise {
+  from { transform: translateY(30px); }
+}
+
+.mono-sheet-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 5px solid var(--g);
+}
+
+.mono-sheet-head strong { font-size: 20px; font-weight: 800; }
+.mono-sheet-head small { font-size: 13px; color: var(--label-2); }
+
+.mono-sheet-note {
+  font-size: 14px;
+  color: var(--label-2);
+}
+
+.mono-sheet-card dl {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-radius: 12px;
+  background: var(--fill);
+}
+
+.mono-sheet-card dl div {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.mono-sheet-card dl div + div { box-shadow: 0 -0.5px 0 var(--separator); }
+.mono-sheet-card dl div.is-on { font-weight: 700; color: var(--accent); }
+.mono-sheet-card dt { color: inherit; }
+.mono-sheet-card dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+.mono-sheet-now { font-size: 14px; }

@@ -8,6 +8,7 @@ import { clock, fmt } from './ui.js';
 export const categories = {
   puzzle: '益智',
   arcade: '街机',
+  board: '桌游',
 };
 
 // 扫雷和数独都按难度记最快用时，卡片上显示最难一档的
@@ -192,6 +193,30 @@ export const games = [
     cover: { colors: ['#4be3e0', '#22a9d6', '#2d5bd0'], ink: '#1d4f69', motif: 'rain' },
     formatRecord: (records) => (records.score ? `最高 ${fmt(records.score)} 分` : ''),
     load: () => import('../games/raindrops/index.js'),
+  },
+  {
+    id: 'monopoly',
+    title: '大富翁',
+    tagline: '掷骰子绕圈走，买地盖房收过路费',
+    category: 'board',
+    status: 'ready',
+    keywords: ['dafuweng', 'fuweng', 'monopoly', 'richman', '地产'],
+    cover: { colors: ['#ff7a6b', '#e3263f', '#7d0d27'], ink: '#5e0a1e', motif: 'monopoly' },
+    // 本机玩家赢电脑的局数（wins 每赢一局加一；几个人轮流玩、没有电脑的局不算）
+    formatRecord: (records) => (records.wins ? `赢过 ${records.wins} 局` : ''),
+    load: () => import('../games/monopoly/index.js'),
+  },
+  {
+    id: 'feixingqi',
+    title: '飞行棋',
+    tagline: '掷 6 起飞，跳格飞线撞回对手，先全部到终点就赢',
+    category: 'board',
+    status: 'ready',
+    keywords: ['feixingqi', 'feixing', 'ludo', 'aeroplane', '飞机'],
+    cover: { colors: ['#fff3d6', '#ffcf9c', '#ff9f6e'], ink: '#9a3b12', motif: 'flight' },
+    // 本机玩家一共赢了几局（wins 每赢一局加一）
+    formatRecord: (records) => (records.wins ? `赢过 ${records.wins} 局` : ''),
+    load: () => import('../games/feixingqi/index.js'),
   },
 ];
 

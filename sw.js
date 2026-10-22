@@ -1,7 +1,7 @@
 // 离线缓存：第一次打开时把所有文件存到手机上，之后没有网络也能打开。
 // 发布新版本时改一下 VERSION，手机下次联网打开时会换成新文件。
 // 新增文件（比如新游戏）时，记得把路径加进 ASSETS。
-const VERSION = 'v0.6.0';
+const VERSION = 'v0.7.0';
 const CACHE = `pocket-games-${VERSION}`;
 const ASSETS = [
   './',
@@ -65,6 +65,20 @@ const ASSETS = [
   'games/raindrops/index.js',
   'games/raindrops/rules.js',
   'games/raindrops/style.css',
+  'games/monopoly/ai.js',
+  'games/monopoly/board.js',
+  'games/monopoly/engine.js',
+  'games/monopoly/guide.js',
+  'games/monopoly/index.js',
+  'games/monopoly/style.css',
+  'games/monopoly/table.js',
+  'games/feixingqi/ai.js',
+  'games/feixingqi/board.js',
+  'games/feixingqi/guide.js',
+  'games/feixingqi/index.js',
+  'games/feixingqi/match.js',
+  'games/feixingqi/rules.js',
+  'games/feixingqi/style.css',
   'icons/icon-180.png',
   'icons/icon-192.png',
   'icons/icon-512.png',

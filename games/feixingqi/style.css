@@ -1,0 +1,344 @@
+/* 飞行棋的样式，只作用在 .fx 里面；--accent、--fill、--label 等颜色变量来自外壳。
+   棋盘和飞机画在 canvas 上，颜色在 index.js 里；--c 是某一方的颜色，由 index.js 写在元素上 */
+
+.fx {
+  --fx-dice: #ffffff;
+  --fx-pip: #1c1c1e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 4px 12px 12px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .fx {
+    --fx-dice: #f2f2f7;
+  }
+}
+
+.fx [hidden] { display: none !important; }
+
+/* ---------- 各方和新游戏 ---------- */
+
+.fx-top {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  width: min(100%, 520px);
+}
+
+.fx-players {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fx-chip {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 9px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 13px;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.fx-chip i {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c);
+}
+
+/* 名字只有一个字，不许被挤掉；真挤不下时让右边的数字被裁掉 */
+.fx-chip b {
+  flex: none;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fx-chip small {
+  min-width: 0;
+  overflow: hidden;
+  margin-left: auto;
+  color: var(--label-2);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 四方时 iPhone SE 上每个牌子只有六十来像素宽：间距、圆点和数字都收小一点，名字和「0/4」都放得下 */
+.fx-players.is-four { gap: 4px; }
+.fx-players.is-four .fx-chip { gap: 4px; padding: 0 6px; }
+.fx-players.is-four .fx-chip i { width: 8px; height: 8px; }
+.fx-players.is-four .fx-chip small { font-size: 11px; }
+
+.fx-chip.is-turn {
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  box-shadow: inset 0 0 0 2px var(--c);
+}
+
+.fx-new {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--fill);
+  color: var(--label-2);
+}
+
+.fx-new svg { width: 18px; height: 18px; }
+.fx-new:active { opacity: 0.6; }
+
+/* ---------- 棋盘 ---------- */
+
+.fx-stage {
+  position: relative;
+  display: grid;
+  flex: 1;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+}
+
+.fx-stage canvas {
+  display: block;
+  touch-action: none;
+}
+
+.fx-toast {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  padding: 7px 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--label) 82%, transparent);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: fx-rise 0.3s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  transition: opacity 0.4s;
+}
+
+.fx-toast.is-out { opacity: 0; }
+
+@keyframes fx-rise {
+  from { opacity: 0; translate: 0 -6px; }
+}
+
+.fx-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 30%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: fx-fade 0.25s ease both;
+}
+
+@keyframes fx-fade {
+  from { opacity: 0; }
+}
+
+.fx-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: min(100%, 320px);
+  padding: 20px 18px 18px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.fx-panel h3 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.fx-panel p {
+  margin-top: -6px;
+  color: var(--label-2);
+  font-size: 15px;
+}
+
+.fx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.fx-field > span {
+  color: var(--label-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fx-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.fx-seg button,
+.fx-colors button {
+  display: grid;
+  place-items: center;
+}
+
+.fx-seg button {
+  flex: 1;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.fx-seg button.is-active {
+  background: var(--bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+
+.fx-colors {
+  display: flex;
+  gap: 8px;
+}
+
+.fx-colors button {
+  flex: 1;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+  color: var(--label);
+  font-size: 15px;
+  font-weight: 700;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.fx-colors button.is-active {
+  background: var(--c);
+  color: #fff;
+}
+
+.fx-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.fx-btn {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 22px;
+  background: var(--fill-2);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.fx-btn.is-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.fx-btn:active,
+.fx-seg button:active,
+.fx-colors button:active { opacity: 0.7; }
+
+/* ---------- 骰子和提示 ---------- */
+
+.fx-bottom {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  width: min(100%, 520px);
+  height: 72px;
+  padding: 0 4px;
+}
+
+.fx-dice {
+  --c: var(--label-3);
+  display: grid;
+  flex: none;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  padding: 9px;
+  border-radius: 16px;
+  background: var(--fx-dice);
+  box-shadow: 0 0 0 3px var(--c), 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.fx-dice i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--fx-pip);
+  opacity: 0;
+}
+
+.fx-dice i.is-on { opacity: 1; }
+.fx-dice[data-value="1"] i.is-on { background: #ff3b30; transform: scale(1.4); }
+
+.fx-dice.is-rolling { animation: fx-shake 0.16s linear infinite; }
+
+@keyframes fx-shake {
+  25% { transform: rotate(-9deg) scale(1.04); }
+  75% { transform: rotate(9deg) scale(1.04); }
+}
+
+/* 轮到你掷骰子：骰子轻轻跳，边框换成你的颜色（index.js 写在 --c 上） */
+.fx-dice.is-ready { animation: fx-bob 1s ease-in-out infinite; }
+
+@keyframes fx-bob {
+  50% { transform: translateY(-4px); }
+}
+
+.fx-dice:disabled { cursor: default; }
+.fx-dice:not(:disabled):active { transform: scale(0.92); }
+
+.fx-msg {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fx-msg strong {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.fx-msg span {
+  color: var(--label-2);
+  font-size: 14px;
+}

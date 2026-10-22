@@ -7,10 +7,13 @@ import { icon } from '../icons.js';
 import { esc, patch } from '../ui.js';
 import { recordText, tile } from './parts.js';
 
+// 横向栏标题一般是「类别名 + 游戏」；“桌游”本身带“游”字，拼起来会变成“桌游游戏”，单独写
+const SHELF_TITLES = { board: '桌面游戏' };
+
 export function renderHome(el) {
   const recent = progress.getRecent().map(getGame).filter(Boolean);
   const byCategory = Object.entries(categories).map(([key, name]) =>
-    shelf(`${name}游戏`, `category-${key}`, games.filter((game) => game.category === key)));
+    shelf(SHELF_TITLES[key] ?? `${name}游戏`, `category-${key}`, games.filter((game) => game.category === key)));
 
   patch(el, `
     <div class="title-row">

@@ -470,4 +470,62 @@ function rain(game) {
   return `<g transform="rotate(-6 150 150)">${out}</g>`;
 }
 
-const MOTIFS = { tiles, sudoku, mines, merge, hanoi, blocks, klotski, bird, tubes, schulte, crates, jigsaw, memory, rain };
+// 大富翁：一圈地（有几块深一点，是有人买下的），中间两颗白色的骰子
+function monopoly(game) {
+  const pitch = 50;
+  const size = 44;
+  let out = '';
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 6; c++) {
+      if (r > 0 && r < 5 && c > 0 && c < 5) continue;
+      const x = 150 + (c - 2.5) * pitch - size / 2;
+      const y = 150 + (r - 2.5) * pitch - size / 2;
+      out += `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="9" fill="#fff" fill-opacity="${(r * 6 + c) % 4 === 1 ? 0.34 : 0.15}"/>`;
+    }
+  }
+  const die = (cx, cy, pips, angle) => `<g transform="rotate(${angle} ${cx} ${cy})">
+    <rect x="${cx - 31}" y="${cy - 31}" width="62" height="62" rx="14" fill="#fff"/>
+    ${pips.map((k) => `<circle cx="${cx + ((k % 3) - 1) * 18}" cy="${cy + (Math.floor(k / 3) - 1) * 18}" r="6" fill="${game.cover.ink}"/>`).join('')}
+  </g>`;
+  out += die(124, 138, [0, 2, 4, 6, 8], -12) + die(182, 168, [0, 4, 8], 14);
+  return `<g transform="rotate(-8 150 150)">${out}</g>`;
+}
+
+// 飞行棋：斜放的一张棋盘，四色的格子绕成十字、四角是机场，一架描白边的大红飞机从中间往右上飞出去，身后拖一条虚线。
+// 底色很浅，飞机要是白的就看不清，所以用红色
+const FLIGHT_COLORS = ['#ff6b5f', '#ffc928', '#3d9bff', '#3fcf6e'];
+const FLIGHT_TINTS = ['#ffd9d4', '#ffefb8', '#d3e6ff', '#cff3dc'];
+const FLIGHT_PLANE = 'M0 -0.5C0.07 -0.5 0.09 -0.4 0.09 -0.3L0.09 -0.1L0.48 0.12L0.48 0.22L0.09 0.12L0.07 0.32L0.22 0.42L0.22 0.5L0 0.45L-0.22 0.5L-0.22 0.42L-0.07 0.32L-0.09 0.12L-0.48 0.22L-0.48 0.12L-0.09 -0.1L-0.09 -0.3C-0.09 -0.4 -0.07 -0.5 0 -0.5Z';
+
+function flight() {
+  const s = 24;
+  const o = 150 - 7.5 * s;
+  const at = (v) => o + v * s;
+  let out = '';
+  // 四角的机场：红、黄、蓝、绿顺时针
+  [[0, 0], [9, 0], [9, 9], [0, 9]].forEach(([x, y], c) => {
+    out += `<rect x="${at(x) + 4}" y="${at(y) + 4}" width="${6 * s - 8}" height="${6 * s - 8}" rx="16" fill="${FLIGHT_TINTS[c]}"/>`;
+    for (const [dx, dy] of [[2, 2], [4, 2], [2, 4], [4, 4]]) out += `<circle cx="${at(x + dx)}" cy="${at(y + dy)}" r="${s * 0.55}" fill="#fff"/>`;
+  });
+  // 十字上的格子：中间一列（行）是跑道，用那一方的浅色；其余的四色轮流
+  const arm = (x, y) => (y < 6 ? 1 : y > 8 ? 3 : x < 6 ? 0 : 2);
+  for (let y = 0; y < 15; y++) {
+    for (let x = 0; x < 15; x++) {
+      const inCross = (x >= 6 && x <= 8) !== (y >= 6 && y <= 8);
+      if (!inCross) continue;
+      const runway = (x === 7 || y === 7) && x > 0 && x < 14 && y > 0 && y < 14;
+      const fill = runway ? FLIGHT_TINTS[arm(x, y)] : FLIGHT_COLORS[(x + y) % 4];
+      out += `<rect x="${at(x) + 1.5}" y="${at(y) + 1.5}" width="${s - 3}" height="${s - 3}" rx="5" fill="${fill}"/>`;
+    }
+  }
+  // 中间的终点：四个三角形
+  [[[6, 6], [6, 9]], [[6, 6], [9, 6]], [[9, 6], [9, 9]], [[6, 9], [9, 9]]].forEach(([[x1, y1], [x2, y2]], c) => {
+    out += `<path d="M${at(x1)} ${at(y1)}L${at(x2)} ${at(y2)}L${at(7.5)} ${at(7.5)}Z" fill="${FLIGHT_COLORS[c]}"/>`;
+  });
+  out += `<path d="M70 236Q120 210 150 150" fill="none" stroke="${FLIGHT_COLORS[0]}" stroke-opacity=".7" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 14"/>
+    <path d="${FLIGHT_PLANE}" transform="translate(160 130) rotate(40) scale(150)" fill="#000" fill-opacity=".16"/>
+    <path d="${FLIGHT_PLANE}" transform="translate(152 120) rotate(40) scale(150)" fill="#ff3b30" stroke="#fff" stroke-width=".035" stroke-linejoin="round"/>`;
+  return `<g transform="rotate(-10 150 150)">${out}</g>`;
+}
+
+const MOTIFS = { tiles, sudoku, mines, merge, hanoi, blocks, klotski, bird, tubes, schulte, crates, jigsaw, memory, rain, monopoly, flight };

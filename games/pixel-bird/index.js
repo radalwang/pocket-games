@@ -1,5 +1,5 @@
 // 像素小鸟：点一下屏幕小鸟就往上扑一下，从水管之间的缝隙穿过去得 1 分，碰到水管或地面就结束。
-// 画面先画在一张只有 256 像素高的小画布上，再整体放大显示，所以是像素风格；画布宽度随屏幕比例变化。
+// 画面按 256 像素高的点阵来画，每个点放大成整数个屏幕物理像素，所以是像素风格；画布宽度随屏幕比例变化。
 // 物理按固定步长计算，60Hz 和 120Hz 的屏幕手感一样。图案全部用代码画，不需要图片文件。
 
 const H = 256;
@@ -514,7 +514,7 @@ class Game {
       this.refs[el.dataset.ref] = el;
     });
     this.W = MIN_W;
-    this.setCanvasWidth(MIN_W);
+    this.setCanvasSize(MIN_W, 1);
 
     this.frame = this.frame.bind(this);
     this.onKey = this.onKey.bind(this);
@@ -833,11 +833,21 @@ class Game {
 
   // ---------- 画面 ----------
 
-  setCanvasWidth(w) {
+  // 画布按物理像素分配：宽高是游戏像素的 k 倍，画的时候整体放大 k 倍。
+  // 这样移动得慢的远景每帧也能挪一点，不用攒够一整个游戏像素（好几个物理像素）才跳一下。
+  // 改了画布大小，画笔的设置会被清空，要重新关掉平滑
+  setCanvasSize(w, k) {
     this.W = w;
-    this.refs.canvas.width = w;
+    this.k = k;
+    this.refs.canvas.width = w * k;
+    this.refs.canvas.height = H * k;
     this.g = this.refs.canvas.getContext('2d');
     this.g.imageSmoothingEnabled = false;
+  }
+
+  // 位置取到整数个物理像素，图案的每个点都和屏幕像素对齐，放大后依然清晰
+  px(v) {
+    return Math.round(v * this.k) / this.k;
   }
 
   // 高度固定 256，宽度按可用区域的比例算，整张画面再等比放大。
@@ -850,17 +860,20 @@ class Game {
     const fitted = Math.min(width / natural, height / H);
     const scale = Math.floor(fitted * dpr) / dpr || fitted;
     const w = clamp(Math.floor(width / scale), MIN_W, MAX_W);
-    if (w !== this.W) this.setCanvasWidth(w);
+    // 画面太小、倍数不到一个物理像素时，就按游戏像素画，交给浏览器缩小
+    const k = Math.max(1, Math.round(scale * dpr));
+    if (w !== this.W || k !== this.k) this.setCanvasSize(w, k);
     this.refs.screen.style.width = `${w * scale}px`;
     this.refs.screen.style.height = `${H * scale}px`;
     this.draw();
   }
 
   draw() {
-    const { g, W } = this;
+    const { g, W, k } = this;
+    g.setTransform(k, 0, 0, k, 0, 0);
     g.save();
     if (this.shake > 0) {
-      g.translate(Math.round((Math.random() - 0.5) * 4), Math.round((Math.random() - 0.5) * 4));
+      g.translate(this.px((Math.random() - 0.5) * 4), this.px((Math.random() - 0.5) * 4));
     }
     if (this.themeT < 1) {
       this.drawScenery(this.themeFrom, 1);
@@ -869,7 +882,7 @@ class Game {
       this.drawScenery(this.theme, 1);
     }
 
-    const scroll = Math.round(this.dist);
+    const scroll = this.px(this.dist);
     const tint = this.tint();
     for (const pipe of this.pipes) this.drawPipe(pipe.wx - scroll, pipe, tint);
     g.drawImage(this.art.ground, -(scroll % 8), GROUND_Y);
@@ -897,7 +910,7 @@ class Game {
     g.globalAlpha = alpha;
     g.drawImage(layers.sky, 0, 0);
     for (const [layer, period, speed] of [[layers.clouds, CLOUD_P, 0.12], [layers.city, CITY_P, 0.25], [layers.bushes, BUSH_P, 0.5]]) {
-      for (let x = -(Math.floor(this.dist * speed) % period); x < W; x += period) g.drawImage(layer, x, 0);
+      for (let x = -(this.px(this.dist * speed) % period); x < W; x += period) g.drawImage(layer, x, 0);
     }
     g.globalAlpha = 1;
   }
@@ -939,7 +952,7 @@ class Game {
     const rate = this.state === 'ready' ? 8 : 14;
     const frame = still ? 1 : FLAP_CYCLE[Math.floor(this.time * rate) % FLAP_CYCLE.length];
     g.save();
-    g.translate(BIRD_X, Math.round(bird.y));
+    g.translate(BIRD_X, this.px(bird.y));
     g.rotate(bird.rot);
     g.drawImage(this.art.birds[this.skin][frame], -9, -6);
     g.restore();
@@ -1051,7 +1064,178 @@ class Game {
   }
 }
 
+// ---------- 玩法说明 ----------
+// 外壳第一次打开游戏、或点标题栏的“?”时显示。示意图用游戏里同样的点阵和颜色画成 SVG，静止不动
+
+const GUIDE_FONT = 'font-family="ui-rounded, -apple-system, system-ui, sans-serif"';
+const P = 2; // 示意图里一个游戏像素画多大
+const n1 = (v) => Math.round(v * 10) / 10;
+const svgRect = (x, y, w, h, fill) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`;
+// 点阵部分关掉抗锯齿，相邻的小方块之间才不会露出细缝
+const crisp = (body, attrs = '') => `<g shape-rendering="crispEdges"${attrs}>${body}</g>`;
+
+// 点阵画成矩形，一行里连续同色的点合成一个
+function svgRows(rows, palette, x, y, p) {
+  let out = '';
+  rows.forEach((row, r) => {
+    for (const run of row.matchAll(/([^.])\1*/g)) out += svgRect(x + run.index * p, y + r * p, run[0].length * p, p, palette[run[1]]);
+  });
+  return out;
+}
+
+// 小鸟，(x, y) 是转动的中心，和游戏里一样；wing 是翅膀姿势，rot 是抬头低头的角度（度）
+function svgBird(x, y, wing, rot) {
+  const [top, rows] = WINGS[wing];
+  const art = BIRD_BODY.map((line, r) => [...line].map((ch, c) => {
+    const w = rows[r - top]?.[c];
+    return w && w !== '.' ? w : ch;
+  }).join(''));
+  return crisp(svgRows(art, { k: INK, w: '#fff', ...SKINS[0] }, x - 9 * P, y - 6 * P, P), ` transform="rotate(${rot} ${x} ${y})"`);
+}
+
+// 一排连绵的圆包（云、灌木），画成一条台阶状的路径；puffs 是 [圆心, 半径]，单位是游戏像素
+function svgMounds(x, baseY, cols, puffs, squash, color) {
+  let d = `M${x} ${baseY}`;
+  for (let c = 0; c < cols; c++) {
+    let h = 0;
+    for (const [cx, r] of puffs) {
+      const dx = Math.abs(c - cx);
+      if (dx < r) h = Math.max(h, Math.floor(Math.sqrt(r * r - dx * dx) * squash));
+    }
+    d += `V${baseY - h * P}h${P}`;
+  }
+  return `<path d="${d}V${baseY}Z" fill="${color}"/>`;
+}
+
+// 地面：和游戏里一样的斜条纹，超出画面的部分会被裁掉
+function svgGround(x, y, w, bottom) {
+  let out = svgRect(x, y, w, bottom - y, GROUND.dirt) + svgRect(x, y, w, P, GROUND.edge);
+  for (let r = 1; r <= 5; r++) {
+    out += svgRect(x, y + r * P, w, P, GROUND.light);
+    for (let c = ((4 - r) % 8) - 8; c < w / P; c += 8) out += svgRect(x + c * P, y + r * P, 4 * P, P, GROUND.dark);
+  }
+  return out + svgRect(x, y + 6 * P, w, P, GROUND.base) + svgRect(x, y + 7 * P, w, P, GROUND.top);
+}
+
+// 一对水管，left 是管身左边，缝隙从 top 到 bottom；水管从 y0 一直画到地面 groundY
+function svgPipes(left, top, bottom, y0, groundY) {
+  const columns = (cols, x, y, h) => {
+    let out = '';
+    for (const run of cols.matchAll(/([^.])\1*/g)) out += svgRect(x + run.index * P, y, run[0].length * P, h, PIPE_COLORS[run[1]]);
+    return out;
+  };
+  const cap = (y) => columns(PIPE_CAP, left - 2 * P, y, CAP_H * P)
+    + svgRect(left - 2 * P, y, (PIPE_W + 4) * P, P, INK)
+    + svgRect(left - 2 * P, y + (CAP_H - 1) * P, (PIPE_W + 4) * P, P, INK);
+  return columns(PIPE_BODY, left, y0, top - CAP_H * P - y0) + cap(top - CAP_H * P)
+    + cap(bottom) + columns(PIPE_BODY, left, bottom + CAP_H * P, groundY - bottom - CAP_H * P);
+}
+
+// 游戏里的描边数字，s 是每一格占几个游戏像素
+function svgNumber(text, x, y, s) {
+  let out = '';
+  [...text].forEach((ch, i) => {
+    const ox = x + i * (5 * s + 1) * P;
+    const cells = [];
+    DIGITS[ch].forEach((row, r) => [...row].forEach((c, j) => c === '#' && cells.push([ox + j * s * P, y + r * s * P])));
+    for (const [cx, cy] of cells) out += svgRect(cx, cy, (s + 2) * P, (s + 3) * P, INK);
+    for (const [cx, cy] of cells) out += svgRect(cx + P, cy + P, s * P, s * P, '#fff');
+  });
+  return crisp(out);
+}
+
+// 奖牌，和结算面板上的一样；p 是一个游戏像素画多大
+function svgMedal(medal, x, y, p) {
+  const [rim, face, shine] = medal.colors;
+  const disc = (r, fill) => {
+    let out = '';
+    for (let dy = -r; dy <= r; dy++) {
+      const half = Math.floor(Math.sqrt(r * r - dy * dy));
+      out += svgRect(x + (8 - half) * p, y + (8 + dy) * p, (half * 2 + 1) * p, p, fill);
+    }
+    return out;
+  };
+  return disc(7, INK) + disc(6, rim) + disc(5, face)
+    + svgRect(x + 5 * p, y + 4 * p, 2 * p, p, shine) + svgRect(x + 4 * p, y + 5 * p, p, 2 * p, shine)
+    + svgRows(STAR, { '#': rim }, x + 6 * p, y + 6 * p, p);
+}
+
+// 一块圆角的游戏画面：天空、云、灌木、back（水管）、地面、front（小鸟等），按游戏里的先后顺序叠起来
+function svgScene(id, x, y, w, h, back, front) {
+  const theme = THEMES[0];
+  const cols = w / P;
+  const groundY = y + h - 28;
+  const band = (groundY - y) / 7;
+  let sky = '';
+  for (let i = 0; i < 7; i++) sky += svgRect(x, n1(y + i * band), w, n1(band + 1), mix(theme.skyTop, theme.skyBottom, i / 6));
+  const clouds = svgMounds(x, groundY - 12, cols, [[4, 9], [20, 12], [38, 8], [55, 11], [72, 9], [92, 12], [110, 8], [128, 10]], 0.9, theme.cloud)
+    + svgRect(x, groundY - 12, w, 12, theme.cloud);
+  const bushes = svgMounds(x, groundY, cols, [[2, 7], [15, 9], [29, 6], [43, 8], [57, 7], [71, 9], [85, 6], [99, 8], [113, 7], [127, 9]], 0.75, theme.bush);
+  return `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14"/></clipPath>
+    <g clip-path="url(#${id})">${crisp(sky + clouds + bushes + back + svgGround(x, groundY, w, y + h))}${front}</g>`;
+}
+
+// 点一下的手指位置
+const svgTap = (x, y) => `<circle cx="${x}" cy="${y}" r="14" fill="#fff" fill-opacity=".7" stroke="#000" stroke-opacity=".18" stroke-width="1.5"/>`;
+
+// 从 (x1, y1) 指向 (x2, y2) 的箭头；paint 是描边的颜色写法
+function svgArrow(x1, y1, x2, y2, paint) {
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  const head = (da) => `${n1(x2 - 8 * Math.cos(a + da))} ${n1(y2 - 8 * Math.sin(a + da))}`;
+  return `<path d="M${x1} ${y1}L${x2} ${y2}M${head(0.55)}L${x2} ${y2}L${head(-0.55)}" fill="none" ${paint} stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+const svgArt = (body) => `<svg viewBox="0 0 300 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
+const WHITE_LINE = 'stroke="#fff"';
+const DOTTED = 'fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0.1 7"';
+
+const GUIDE = [
+  {
+    title: '穿过水管',
+    text: '从水管之间的缝隙穿过去，每穿过一根得 1 分。碰到水管或地面就结束了。',
+    art: svgArt(svgScene('pb-1-clip', 10, 6, 280, 158,
+      svgPipes(62, 46, 106, 6, 136) + svgPipes(212, 34, 94, 6, 136),
+      `<path d="M20 98C52 70 70 92 96 76S130 62 150 70S206 58 236 64" ${DOTTED}/>`
+        + svgBird(150, 70, 1, -10)
+        + `<text x="124" y="42" ${GUIDE_FONT} font-size="20" font-weight="800" fill="#fff" stroke="${INK}" stroke-width="4" stroke-linejoin="round" paint-order="stroke">+1</text>`)),
+  },
+  {
+    title: '点一下扑翅膀',
+    text: '点一下屏幕，小鸟就往上扑一下；不点就会往下掉。有节奏地点，稳稳飞过去。',
+    art: svgArt(svgScene('pb-2-clip', 10, 6, 280, 158, '',
+      `<path d="M112 72Q156 -6 206 96" ${DOTTED}/>`
+        + svgArrow(96, 62, 96, 30, WHITE_LINE)
+        + svgArrow(204, 90, 207, 104, WHITE_LINE)
+        + svgBird(96, 84, 0, -24))
+      + svgTap(240, 146)),
+  },
+  {
+    title: '暂停和继续',
+    text: '点左上角暂停，收起游戏页也会自动暂停。倒数 3、2、1 时点一下，马上接着飞。',
+    art: svgArt(svgScene('pb-3-clip', 10, 6, 126, 158, '',
+      svgBird(62, 96, 1, 0) + svgNumber('5', 61, 16, 2)
+        + `<circle cx="34" cy="30" r="15" fill="#14101e" fill-opacity=".28"/>${svgRect(28, 23, 4.5, 14, '#fff')}${svgRect(35.5, 23, 4.5, 14, '#fff')}`)
+      + svgTap(44, 40)
+      + svgArrow(140, 85, 160, 85, 'style="stroke:var(--label-2)"')
+      + svgScene('pb-3-clip-2', 164, 6, 126, 158, '',
+        svgBird(196, 112, 1, 0) + svgNumber('3', 205, 26, 4))
+      + svgTap(258, 146)),
+  },
+  {
+    title: '奖牌和纪录',
+    text: '10 分铜牌、20 分银牌、30 分金牌、40 分白金牌。最高分会一直记着。',
+    art: svgArt(`<rect x="10" y="10" width="280" height="150" rx="16" style="fill:var(--fill)"/>`
+      + [...MEDALS].reverse().map((medal, i) => {
+        const x = 21 + i * 70;
+        return `${crisp(svgMedal(medal, x, 32, 3))}
+          <text x="${x + 24}" y="110" ${GUIDE_FONT} font-size="15" font-weight="700" text-anchor="middle" style="fill:var(--label)">${medal.name}牌</text>
+          <text x="${x + 24}" y="132" ${GUIDE_FONT} font-size="13" text-anchor="middle" style="fill:var(--label-2)">${medal.min} 分</text>`;
+      }).join('')),
+  },
+];
+
 export default {
+  guide: GUIDE,
   async mount(root, ctx) {
     await loadStyles();
     const game = new Game(root, ctx);

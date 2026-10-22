@@ -436,7 +436,125 @@ class Game {
   }
 }
 
+// 玩法说明：外壳第一次打开这个游戏时、或点标题栏的“?”时一页页显示。
+// 配图是简化的棋盘，数字的颜色取自游戏里每个数字渐变的中间色；中性的底色、文字和线条用外壳的颜色变量，深色模式下也看得清。
+const GUIDE_COLORS = [null, '#4dbdf8', '#4fd07a', '#ffcf45', '#ff9446', '#ff5c68', '#f25faa', '#b06ef8', '#716fec', '#2bb9ae', '#ffb62f'];
+
+// color 是颜色值，或者外壳的颜色变量名（比如 --label-2）
+const guidePaint = (color) => (color.startsWith('--') ? `style="fill:var(${color})"` : `fill="${color}"`);
+
+function guideText(x, y, text, { size, color, weight = 800, anchor = 'middle' }) {
+  return `<text x="${x}" y="${y}" font-family="ui-rounded, -apple-system, system-ui, sans-serif" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" dominant-baseline="central" ${guidePaint(color)}>${text}</text>`;
+}
+
+// 一个数字方块；mark 是 pick（选中，描白边）、dim（没选中，变淡）或 pop（刚合出来，外面一圈光）
+function guideTile(x, y, size, n, mark) {
+  const color = GUIDE_COLORS[n];
+  const rx = Math.round(size / 4);
+  let out = '';
+  if (mark === 'pop') out += `<rect x="${x - 3.5}" y="${y - 3.5}" width="${size + 7}" height="${size + 7}" rx="${rx + 3}" fill="none" stroke="${color}" stroke-width="2.5" stroke-opacity="0.5"/>`;
+  out += `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${rx}" fill="${color}"/>`;
+  if (mark === 'pick') out += `<rect x="${x + 1.5}" y="${y + 1.5}" width="${size - 3}" height="${size - 3}" rx="${rx - 1.5}" fill="none" stroke="#fff" stroke-width="3"/>`;
+  out += guideText(x + size / 2, y + size / 2, n, { size: Math.round(size * (n > 9 ? 0.4 : 0.5)), color: n === 3 ? '#8a5300' : '#fff' });
+  return mark === 'dim' ? `<g opacity="0.4">${out}</g>` : out;
+}
+
+// 一块棋盘：rows 是每一行的数字，marks 按 'r,c' 标出特殊的格子，rest 是其余格子的标记
+function guideBoard(x, y, cell, gap, rows, marks = {}) {
+  const width = rows[0].length * (cell + gap) + gap;
+  const height = rows.length * (cell + gap) + gap;
+  let out = `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${gap * 2}" style="fill:var(--fill)"/>`;
+  rows.forEach((row, r) => row.forEach((n, c) => {
+    out += guideTile(x + gap + c * (cell + gap), y + gap + r * (cell + gap), cell, n, marks[`${r},${c}`] ?? marks.rest);
+  }));
+  return out;
+}
+
+// 棋盘上第 i 行（列）格子的中心，用来摆点击标记
+const guideCenter = (start, cell, gap, i) => start + gap + i * (cell + gap) + cell / 2;
+
+const guideTap = (x, y) => `<circle cx="${x}" cy="${y}" r="14" fill="#fff" fill-opacity="0.7" stroke="#000" stroke-opacity="0.18" stroke-width="1.5"/>`;
+
+const guideArrow = (x1, x2, y) =>
+  `<path d="M${x1} ${y}H${x2}M${x2 - 7} ${y - 7}L${x2} ${y}L${x2 - 7} ${y + 7}" fill="none" style="stroke:var(--label-2)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+// 进度条：1 到 10，peak 以内的点亮，10 用虚线框标成目标
+function guideLadder(x, y, peak) {
+  let out = '';
+  for (let n = 1; n <= GOAL; n++) {
+    const left = x + (n - 1) * 28;
+    if (n <= peak) {
+      out += `<rect x="${left}" y="${y}" width="24" height="24" rx="6" fill="${GUIDE_COLORS[n]}"/>`;
+      out += guideText(left + 12, y + 12, n, { size: 12, color: n === 3 ? '#8a5300' : '#fff' });
+    } else if (n === GOAL) {
+      out += `<rect x="${left + 1}" y="${y + 1}" width="22" height="22" rx="5" fill="none" style="stroke:var(--label-2)" stroke-width="2" stroke-dasharray="3 3"/>`;
+      out += guideText(left + 12, y + 12, n, { size: 12, color: '--label-2' });
+    } else {
+      out += `<rect x="${left}" y="${y}" width="24" height="24" rx="6" style="fill:var(--fill)"/>`;
+      out += guideText(left + 12, y + 12, n, { size: 12, color: '--label-3' });
+    }
+  }
+  return out;
+}
+
+function guideScore(y, label, value) {
+  return `<rect x="184" y="${y}" width="100" height="32" rx="10" style="fill:var(--fill)"/>${guideText(196, y + 16, label, { size: 11, weight: 600, anchor: 'start', color: '--label-2' })}${guideText(274, y + 16, value, { size: 16, anchor: 'end', color: '--label' })}`;
+}
+
+const guideArt = (body) => `<svg viewBox="0 0 300 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
+
+const PICKED_THREES = { '1,0': 'pick', '1,1': 'pick', '2,1': 'pick', rest: 'dim' };
+
+const GUIDE = [
+  {
+    title: '合到 10',
+    text: '相连的相同数字能合成更大的数，合到 10 就赢了，还可以接着往上合。',
+    art: guideArt(
+      guideTile(30, 60, 50, 9) +
+        guideTile(86, 60, 50, 9) +
+        guideText(169, 67, '+1', { size: 15, color: '--label-2' }) +
+        guideArrow(152, 186, 85) +
+        '<rect x="198" y="46" width="78" height="78" rx="22" fill="#ffb62f" fill-opacity="0.22"/>' +
+        guideTile(204, 52, 66, 10),
+    ),
+  },
+  {
+    title: '选中一组',
+    text: '点一下连在一起的相同数字，至少两个，整组会描上白边、轻轻跳动。',
+    art: guideArt(
+      guideBoard(59, 16, 38, 6, [[2, 1, 4, 2], [3, 3, 1, 4], [1, 3, 2, 1]], PICKED_THREES) +
+        guideTap(guideCenter(59, 38, 6, 1), guideCenter(16, 38, 6, 1)),
+    ),
+  },
+  {
+    title: '再点合并',
+    // 点的是最下面那个 3：合成的 4 留在那格，左边两列上面的数字各落一格，顶上补两个新数字
+    text: '再点组里任意一格，整组就在那格合成大 1 的数，上面的落下，顶上补新数。',
+    art: guideArt(
+      guideBoard(18, 34, 30, 5, [[1, 2, 4], [3, 3, 1], [2, 3, 4]], PICKED_THREES) +
+        guideTap(guideCenter(18, 30, 5, 1), guideCenter(34, 30, 5, 2)) +
+        guideArrow(140, 164, 89) +
+        guideBoard(172, 34, 30, 5, [[3, 1, 4], [1, 2, 1], [2, 4, 4]], { '2,1': 'pop' }) +
+        [0, 1].map((c) => {
+          const x = guideCenter(172, 30, 5, c);
+          return `<path d="M${x - 6} 19l6 6l6 -6" fill="none" style="stroke:var(--label-2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+        }).join(''),
+    ),
+  },
+  {
+    title: '进度和结束',
+    text: '上面那排小格随合出的数点亮，一次合得越多分越高。没有相邻的相同数字时，这一局结束。',
+    art: guideArt(
+      guideLadder(12, 16, 6) +
+        guideBoard(16, 72, 30, 5, [[5, 2, 6, 3], [3, 4, 2, 5]]) +
+        guideScore(72, '分数', '1,240') +
+        guideScore(113, '最高', '2,860'),
+    ),
+  },
+];
+
 export default {
+  guide: GUIDE,
   async mount(root, ctx) {
     await loadStyles();
     const game = new Game(root, ctx);

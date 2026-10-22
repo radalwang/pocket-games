@@ -538,7 +538,148 @@ class Sudoku {
   }
 }
 
+// ---------- 玩法介绍 ----------
+// 第一次打开游戏时外壳会自动显示，之后点标题栏的“?”还能再看。配图是照着游戏画面简化的 300×170 示意图：
+// 中性的字、线和底色用外壳的颜色变量，深浅色模式下都看得清；游戏自己的颜色直接写死
+
+const ART_INK = '#6b69ee'; // 介于浅色模式的 #5856d6 和深色模式的 #8e8cff 之间，两种底色上都看得清
+const ART_RED = '#ff3b30';
+const ART_FONT = 'font-family="ui-rounded, -apple-system, system-ui, sans-serif" text-anchor="middle" dominant-baseline="central"';
+// 格子的底色：同行列宫、选中、填错，分别是 [颜色, 不透明度]
+const PEER = [ART_INK, 0.16];
+const SEL = [ART_INK, 0.4];
+const WRONG = [ART_RED, 0.16];
+
+// 一盘填好的数独，示意图里的数字都从这里取，保证不重复
+const solved = (r, c) => ((r * 3 + Math.floor(r / 3) + c) % 9) + 1;
+
+const art = (body) => `<svg viewBox="0 0 300 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
+const label = (x, y, text, size, color = 'var(--label)', weight = 600) =>
+  `<text x="${x}" y="${y}" ${ART_FONT} font-size="${size}" font-weight="${weight}" style="fill:${color}">${text}</text>`;
+const pill = (x, y, w, h, rx, color, opacity = 1) =>
+  `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" style="fill:${color}" fill-opacity="${opacity}"/>`;
+// 手指点在哪里
+const tapAt = (x, y) => `<circle cx="${x}" cy="${y}" r="14" fill="#fff" fill-opacity=".7" stroke="#000" stroke-opacity=".15"/>`;
+// 工具栏的图标，直接用上面按钮里的线条，(x, y) 是图标中心
+const icon = (svg, x, y, color) =>
+  `<g transform="translate(${x - 12} ${y - 12})" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="stroke:${color}">${svg.replace(/^<svg[^>]*>|<\/svg>$/g, '')}</g>`;
+const badge = (x, y, text, color) => pill(x, y, 18, 16, 8, color) + label(x + 9, y + 8, text, 10, '#fff', 700);
+
+// 画一块棋盘：rows×cols 格，每格边长 size；cell(r, c) 返回这一格的样子 { bg, digit, color, weight, notes }。
+// 左上角那格在整盘里的行列决定粗线画在哪，所以传进 r0、c0
+function board(x0, y0, size, rows, cols, cell, r0 = 0, c0 = 0) {
+  const w = cols * size;
+  const h = rows * size;
+  let out = pill(x0, y0, w, h, 4, 'var(--bg)');
+  let marks = '';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const { bg, digit, color = 'var(--label)', weight = 600, notes = [] } = cell(r, c) ?? {};
+      const x = x0 + c * size;
+      const y = y0 + r * size;
+      if (bg) out += pill(x, y, size, size, 0, ...bg);
+      if (digit) marks += label(x + size / 2, y + size / 2, digit, size * 0.62, color, weight);
+      // 笔记的小数字和游戏里一样排成 3×3
+      for (const d of notes) {
+        const k = d - 1;
+        marks += label(x + size * (0.2 + (k % 3) * 0.3), y + size * (0.2 + Math.floor(k / 3) * 0.3), d, size * 0.24, 'var(--label-2)');
+      }
+    }
+  }
+  const lines = { thin: '', thick: '' };
+  const line = (x1, y1, x2, y2, thick) => {
+    lines[thick ? 'thick' : 'thin'] += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:var(--label-2)" stroke-width="${thick ? 1.6 : 0.8}" stroke-opacity="${thick ? 1 : 0.35}"/>`;
+  };
+  for (let c = 1; c < cols; c++) line(x0 + c * size, y0, x0 + c * size, y0 + h, (c0 + c) % 3 === 0);
+  for (let r = 1; r < rows; r++) line(x0, y0 + r * size, x0 + w, y0 + r * size, (r0 + r) % 3 === 0);
+  const frame = `<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="4" fill="none" style="stroke:var(--label-2)" stroke-width="1.6"/>`;
+  return out + lines.thin + lines.thick + frame + marks;
+}
+
+// 规则：标出一行、一列、一宫，里面正好是 1 到 9
+function ruleArt() {
+  const marked = (r, c) => r === 1 || c === 6 || (r >= 6 && c < 3);
+  return art(
+    board(78, 18, 16, 9, 9, (r, c) => (marked(r, c) ? { bg: PEER, digit: solved(r, c) } : null))
+    + label(64, 42, '行', 12, ART_INK, 700) + label(182, 9, '列', 12, ART_INK, 700) + label(64, 138, '宫', 12, ART_INK, 700),
+  );
+}
+
+// 填数：先点空格，再点数字键；填错的标红。# 题目给的数，. 空格，s 选中的格子，w 填错的，u 自己填对的
+const FILL_ROWS = ['#w..#.#..', '#.#.s.#.#', '.#.#.#.u.'];
+
+function fillArt() {
+  const cells = board(42, 12, 24, 3, 9, (r, c) => {
+    const ch = FILL_ROWS[r][c];
+    if (ch === 's') return { bg: SEL };
+    if (ch === 'w') return { bg: WRONG, digit: 8, color: ART_RED };
+    return {
+      bg: r === 1 || (c >= 3 && c < 6) ? PEER : null,
+      digit: ch === '.' ? 0 : solved(r + 3, c),
+      color: ch === 'u' ? ART_INK : 'var(--label)',
+      weight: ch === '#' ? 700 : 600,
+    };
+  });
+  const pad = DIGITS.map((d, k) => pill(8 + k * 32, 100, 28, 50, 9, 'var(--fill)') + label(22 + k * 32, 125, d, 20, ART_INK)).join('');
+  // 点格子的手指稍微偏右下，露出选中格子的底色
+  return art(cells + pad + tapAt(155, 53) + tapAt(278, 125));
+}
+
+// 笔记：打开笔记后，格子里记的是小数字
+const NOTES_BOX = [
+  [2, [1, 4], 7],
+  [[1, 8], [1, 4, 8], 6],
+  [5, 3, [4, 8, 9]],
+];
+
+function notesArt() {
+  const button = icon(PENCIL, 62, 74, ART_INK) + label(62, 102, '笔记', 12, ART_INK) + badge(69, 54, '开', ART_INK);
+  const box = board(150, 25, 40, 3, 3, (r, c) => {
+    const v = NOTES_BOX[r][c];
+    return Array.isArray(v) ? { bg: r === 1 && c === 1 ? SEL : null, notes: v } : { digit: v, weight: 700 };
+  });
+  return art(button + tapAt(62, 74) + box);
+}
+
+// 工具栏：提示填进选中的格子，按钮上的数字是还剩几次
+const TOOLS_ROW = [4, 'w', 9, 0, 'h', 1, 'u'];
+
+function toolsArt() {
+  const strip = board(45, 28, 30, 1, 7, (r, c) => {
+    const v = TOOLS_ROW[c];
+    if (v === 'w') return { bg: WRONG, digit: 7, color: ART_RED };
+    if (v === 'h') return { bg: SEL, digit: 2, color: ART_INK };
+    if (v === 'u') return { digit: 5, color: ART_INK };
+    return { digit: v, weight: 700 };
+  });
+  const tools = [[UNDO, '撤销'], [ERASE, '擦除'], [PENCIL, '笔记', '关'], [BULB, '提示', '2']].map(([svg, name, count], k) => {
+    const x = 37.5 + k * 75;
+    return icon(svg, x, 100, 'var(--label-2)') + label(x, 123, name, 12, 'var(--label-2)') + (count ? badge(x + 7, 84, count, '#6e6e73') : '');
+  }).join('');
+  return art(strip + tools + tapAt(262.5, 100));
+}
+
+// 难度和用时：每档难度分开记最快用时
+function levelArt() {
+  // 选中的那档描一圈细边，深色模式下也认得出
+  const levels = pill(30, 30, 240, 34, 10, 'var(--fill)') + pill(32, 32, 77.3, 30, 8, 'var(--bg)')
+    + '<rect x="32" y="32" width="77.3" height="30" rx="8" fill="none" style="stroke:var(--label-2)" stroke-opacity=".3"/>'
+    + Object.values(LEVELS).map((name, k) => label(70.7 + k * 79.3, 47, name, 14)).join('');
+  const time = pill(30, 86, 112, 48, 14, 'var(--fill)') + label(56, 110, '用时', 13, 'var(--label-2)') + label(100, 110, '4:32', 20, 'var(--label)', 700);
+  const best = pill(152, 86, 118, 48, 14, '#34c759', 0.18) + label(211, 110, '初级最快 3:58', 13);
+  return art(levels + tapAt(99, 55) + time + best);
+}
+
+const GUIDE = [
+  { title: '填满九宫格', text: '每一行、每一列和每个 3×3 宫里，1 到 9 都要正好出现一次。', art: ruleArt() },
+  { title: '点格子填数字', text: '先点一个空格，再点下面的数字填进去。填错的数字会变红。', art: fillArt() },
+  { title: '做笔记', text: '拿不准时打开笔记，点数字会在格子里记下小数字，再点一次就去掉。', art: notesArt() },
+  { title: '提示和撤销', text: '卡住了就点提示，每局 3 次，提示的数不能撤销。撤销退回上一步，擦除清掉填错的数。', art: toolsArt() },
+  { title: '难度和计时', text: '上面可以换难度，新手先从初级玩起。每档难度分开记最快用时。', art: levelArt() },
+];
+
 export default {
+  guide: GUIDE,
   async mount(root, ctx) {
     await loadStyles();
     const game = new Sudoku(root, ctx);

@@ -670,12 +670,14 @@ svg { display: block; }
   padding: 0 12px;
 }
 
-.icon-btn,
-.icon-btn-spacer {
+.icon-btn {
   flex: none;
   width: 40px;
   height: 40px;
 }
+
+/* 没有玩法介绍的游戏只占位，标题仍然居中 */
+.icon-btn.is-hidden { visibility: hidden; }
 
 .icon-btn {
   display: grid;
@@ -715,6 +717,127 @@ svg { display: block; }
 }
 
 .game-root { height: 100%; }
+
+/* ---------- 玩法介绍：盖在游戏页上的分步卡片，左右滑动翻页 ---------- */
+
+.guide {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + 20px) 16px calc(var(--safe-bottom) + 20px);
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+
+.guide[hidden] { display: none; }
+.guide.is-open { opacity: 1; }
+
+.guide-card {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 380px);
+  max-height: 100%;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--bg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  transform: translateY(16px) scale(0.98);
+  transition: transform 0.4s var(--ease);
+}
+
+.guide.is-open .guide-card { transform: none; }
+
+.guide-pages {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.guide-pages::-webkit-scrollbar { display: none; }
+
+.guide-page {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding: 16px 16px 0;
+  scroll-snap-align: start;
+}
+
+.guide-art {
+  aspect-ratio: 300 / 170;
+  overflow: hidden;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--tint, var(--accent)) 14%, var(--bg));
+}
+
+.guide-art svg { width: 100%; height: 100%; }
+
+.guide-title {
+  margin: 16px 4px 0;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+/* 固定两行高，翻页时按钮不会上下跳 */
+.guide-text {
+  min-height: 2.9em;
+  margin: 6px 4px 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--label-2);
+  text-wrap: pretty;
+}
+
+.guide-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.guide-dots {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+}
+
+.guide-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--fill-2);
+  transition: width 0.25s var(--ease), background-color 0.25s;
+}
+
+.guide-dots span.is-active {
+  width: 18px;
+  background: var(--accent);
+}
+
+.guide-skip {
+  height: 40px;
+  padding: 0 6px;
+  font-size: 15px;
+  color: var(--label-2);
+}
+
+.guide-next {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.guide-skip:active,
+.guide-next:active { opacity: 0.7; }
 
 /* ---------- 设置（卡片式弹层） ---------- */
 

@@ -1,8 +1,11 @@
 /* 华容道的样式，只作用在 .hrd 里面；--accent、--fill、--label 等颜色变量来自外壳 */
 
 .hrd {
-  --hrd-frame: #dccfb9;
-  --hrd-board: #f4eee4;
+  --hrd-frame: #d4d4dc;
+  --hrd-board: #e3e3e9;
+  --hrd-bing-a: #fff;
+  --hrd-bing-b: #e4e4ea;
+  --hrd-bing-ink: #48484a;
   --hrd-done: #248a3d;
   display: flex;
   flex-direction: column;
@@ -16,8 +19,11 @@
 
 @media (prefers-color-scheme: dark) {
   .hrd {
-    --hrd-frame: #3a3a3c;
+    --hrd-frame: #2c2c2e;
     --hrd-board: #1c1c1e;
+    --hrd-bing-a: #3a3a3c;
+    --hrd-bing-b: #2c2c2e;
+    --hrd-bing-ink: #e5e5ea;
     --hrd-done: #30d158;
   }
 }
@@ -29,18 +35,8 @@
   width: min(100%, 440px);
 }
 
-/* 四类棋子的颜色：曹操红、关羽绿、其他大将蓝、兵黄 */
-.hrd .k-cao { --hi: #ff7b6b; --lo: #e5352c; --ink: #fff; }
-.hrd .k-guan { --hi: #5cd67c; --lo: #1f9e57; --ink: #fff; }
-.hrd .k-general { --hi: #6ab6ff; --lo: #2f6fe0; --ink: #fff; }
-.hrd .k-bing { --hi: #ffd76e; --lo: #f3a51f; --ink: #7a4300; }
-
-@media (prefers-color-scheme: dark) {
-  .hrd .k-cao { --hi: #f2665a; --lo: #c42a22; }
-  .hrd .k-guan { --hi: #45c06a; --lo: #17834a; }
-  .hrd .k-general { --hi: #559ff0; --lo: #2459c2; }
-  .hrd .k-bing { --hi: #f5c552; --lo: #d98a12; --ink: #5c3200; }
-}
+/* 曹操和五员大将的渐变色写在 index.js 的 COLORS 里，由棋子的 --a、--b 带进来；兵是浅色的，深色模式下换成深灰（见上面的 --hrd-bing-*） */
+.hrd .k-bing { --a: var(--hrd-bing-a); --b: var(--hrd-bing-b); --ink: var(--hrd-bing-ink); }
 
 /* ---------- 关卡、步数、最好成绩 ---------- */
 
@@ -156,7 +152,7 @@
   inset: 3px;
 }
 
-/* 出口：边框下沿中间开一个口子，下面写“出口” */
+/* 出口：边框下沿中间开一个口子，口子里一道强调色，下面写“出口” */
 .hrd-exit {
   position: absolute;
   bottom: 0;
@@ -164,6 +160,17 @@
   width: calc(var(--bw) * 0.5 - 6px);
   height: calc(var(--pad) + 2px);
   background: var(--hrd-board);
+}
+
+.hrd-exit::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(var(--pad) / 2 - 1.5px);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 .hrd-exit::after {
@@ -196,19 +203,18 @@
   cursor: grabbing;
 }
 
+/* 和首页封面、2048 的方块是同一种画法：左上到右下的双色渐变，右上角一点白色光泽；字用圆体粗体 */
 .hrd-face {
   display: grid;
   place-items: center;
   height: 100%;
   border-radius: calc(var(--cell) * 0.17);
-  background: linear-gradient(160deg, var(--hi), var(--lo));
-  box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -3px 0 rgba(0, 0, 0, 0.13),
-    0 1.5px 3px rgba(0, 0, 0, 0.18);
-  color: var(--ink);
-  font-family: "Kaiti SC", "STKaiti", "KaiTi", "PingFang SC", serif;
-  font-size: calc(var(--cell) * 0.32);
+  background:
+    radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.38), transparent 55%),
+    linear-gradient(135deg, var(--a), var(--b));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  color: var(--ink, #fff);
+  font-size: calc(var(--cell) * 0.3);
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.12em;
@@ -218,17 +224,14 @@
 
 .hrd-face span { margin-right: -0.12em; }
 .hrd .is-tall .hrd-face span { margin: 0 0 -0.12em; writing-mode: vertical-rl; }
-.hrd .k-cao .hrd-face { font-size: calc(var(--cell) * 0.44); }
-.hrd .k-bing .hrd-face { font-size: calc(var(--cell) * 0.38); text-shadow: none; }
+.hrd .k-cao .hrd-face { font-size: calc(var(--cell) * 0.42); }
+.hrd .k-bing .hrd-face { font-size: calc(var(--cell) * 0.34); text-shadow: none; }
 
 .hrd-piece.is-held .hrd-face { transform: scale(0.96); }
 
 .hrd-piece.is-dragging .hrd-face {
   transform: scale(1.03);
-  box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -3px 0 rgba(0, 0, 0, 0.13),
-    0 8px 18px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
 }
 
 .hrd-piece.enter { animation: hrd-in 0.34s cubic-bezier(0.2, 0.8, 0.3, 1.25) var(--d, 0ms) backwards; }
@@ -247,14 +250,9 @@
   75% { transform: translateX(3px); }
 }
 
+/* 提示：棋子外面亮一圈强调色，中间隔一道棋盘色的缝，红色的曹操、白色的兵也看得清 */
 @keyframes hrd-hint {
-  30% {
-    box-shadow:
-      inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
-      inset 0 -3px 0 rgba(0, 0, 0, 0.13),
-      0 0 0 3px #fff,
-      0 0 18px 6px var(--hi);
-  }
+  30% { box-shadow: 0 0 0 2px var(--hrd-board), 0 0 0 5px var(--accent), 0 6px 16px rgba(0, 0, 0, 0.2); }
 }
 
 @keyframes hrd-escape {
@@ -386,11 +384,6 @@
   width: 40px;
   height: 50px;
 }
-
-.hrd-card .p-cao { fill: #e5352c; }
-.hrd-card .p-guan { fill: #1f9e57; }
-.hrd-card .p-general { fill: #2f6fe0; }
-.hrd-card .p-bing { fill: #f3a51f; }
 
 .hrd-card-text {
   display: flex;

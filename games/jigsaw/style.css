@@ -1,0 +1,448 @@
+/* 拼图的样式，只作用在 .jg 里面；--accent、--fill、--label 等颜色变量来自外壳。
+   拼图块是一个个 canvas：在托盘里是普通的排队元素，拼好的放在画板上，散放的和正在拖的放在最上面的浮层里 */
+
+.jg {
+  --jg-seg-on: #fff;
+  --jg-board: rgba(120, 120, 128, 0.12);
+  --jg-ghost: 0.22;
+  --jg-badge: #6e6e73;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .jg {
+    --jg-seg-on: #636366;
+    --jg-board: rgba(118, 118, 128, 0.2);
+    --jg-ghost: 0.18;
+    --jg-badge: var(--label-3);
+  }
+}
+
+.jg [hidden] { display: none !important; }
+
+.jg > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* ---------- 难度 ---------- */
+
+.jg-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.jg-seg button {
+  flex: 1;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.jg-seg button.is-active {
+  background: var(--jg-seg-on);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* ---------- 进度、用时、换图 ---------- */
+
+.jg-top {
+  display: flex;
+  gap: 10px;
+  height: 48px;
+}
+
+.jg-stat {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+/* 「48/48」这样的进度也要放得下，标签不换行 */
+.jg-stat span {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-2);
+  white-space: nowrap;
+}
+
+.jg-stat strong {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.jg-new {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.jg-new svg { width: 17px; height: 17px; }
+
+.jg-new:active,
+.jg-again:active,
+.jg-seg button:active,
+.jg-tools button:active,
+.jg-pick:active { opacity: 0.7; }
+
+/* ---------- 画板：3:4，在中间剩下的地方里尽量大，尺寸由 index.js 算好 ---------- */
+
+.jg > .jg-stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.jg-board {
+  position: relative;
+  border-radius: 4px;
+  background: var(--jg-board);
+  box-shadow: inset 0 0 0 1px var(--separator);
+}
+
+.jg-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  opacity: var(--jg-ghost);
+  transition: opacity 0.25s;
+}
+
+.jg.no-ghost .jg-picture { opacity: 0; }
+
+/* 按住看原图：原图盖在所有块上面，散放的块先藏起来 */
+.jg.is-peek .jg-picture {
+  z-index: 2;
+  opacity: 1;
+  transition-duration: 0.12s;
+}
+
+.jg.is-peek .jg-float { opacity: 0; }
+
+/* 拼好了：完整的原图慢慢盖上来，接缝都看不见了，再划过一道光 */
+.jg.is-done .jg-picture {
+  z-index: 2;
+  opacity: 1;
+  transition: opacity 0.8s ease 0.25s;
+}
+
+.jg.is-done .jg-board::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%) no-repeat;
+  background-size: 250% 100%;
+  pointer-events: none;
+  animation: jg-shine 1.1s ease 0.8s both;
+}
+
+@keyframes jg-shine {
+  from { background-position: 130% 0; }
+  to { background-position: -30% 0; }
+}
+
+.jg-placed {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ---------- 拼图块 ---------- */
+
+.jg-piece {
+  display: block;
+  flex: none;
+}
+
+.jg-placed .jg-piece,
+.jg-float .jg-piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.jg > .jg-float {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  width: auto;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+
+/* 散放的块也不接手指：块四周透明的边不能挡住按钮，按下时由 index.js 按块的形状找到它 */
+.jg-float .jg-piece {
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+}
+
+.jg-float .jg-piece.is-dragging {
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.35));
+  transition: none;
+}
+
+.jg-piece.is-away { visibility: hidden; }
+
+/* 吸住的那一下亮一亮 */
+.jg-piece.is-snap { animation: jg-snap 0.5s ease; }
+
+@keyframes jg-snap {
+  30% { filter: brightness(1.35) drop-shadow(0 0 6px rgba(255, 255, 255, 0.9)); }
+}
+
+/* ---------- 工具栏和托盘 ---------- */
+
+.jg-bottom {
+  position: relative;
+}
+
+.jg-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 拼好后保留这块地方，免得画板跳动 */
+.jg-bottom.is-over .jg-controls { visibility: hidden; }
+
+.jg-tools {
+  display: flex;
+  justify-content: space-around;
+}
+
+.jg-tools button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 76px;
+  padding: 2px 0;
+  color: var(--label-2);
+  font-size: 12px;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.jg-tools svg { width: 24px; height: 24px; }
+.jg-tools button.is-active { color: var(--accent); }
+.jg-tools button:disabled { opacity: 0.35; cursor: default; }
+.jg.is-peek .jg-tools [data-tool="peek"] { color: var(--accent); }
+
+.jg-badge {
+  position: absolute;
+  top: -2px;
+  left: calc(50% + 7px);
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--jg-badge);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.jg-tools .is-active .jg-badge { background: var(--accent); }
+
+/* 托盘左右滑动；手指往上拖才会把块拿出来（见 index.js） */
+.jg-tray {
+  position: relative;
+  height: 92px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 16px;
+  background: var(--fill);
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.jg-tray::-webkit-scrollbar { display: none; }
+
+.jg-tray-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: max-content;
+  height: 100%;
+  padding: 0 8px;
+}
+
+.jg-tray-row.is-edges .is-inner { display: none; }
+
+.jg-tray-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 16px;
+  color: var(--label-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ---------- 结果 ---------- */
+
+.jg-result {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 44px;
+  margin-top: -22px;
+  padding: 0 5px 0 16px;
+  border-radius: 22px;
+  background: color-mix(in srgb, #34c759 18%, transparent);
+  font-size: 15px;
+  font-weight: 600;
+  animation: jg-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) 0.6s both;
+}
+
+@keyframes jg-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.jg-again {
+  flex: none;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 17px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ---------- 选图 ---------- */
+
+.jg > .jg-picker {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: auto;
+  padding: 6px 20px 20px;
+  overflow-y: auto;
+  background: var(--bg);
+  touch-action: pan-y;
+  animation: jg-rise 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.jg-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.jg-picker-head h3 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.jg-picker-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--label-2);
+}
+
+.jg-picker-close svg { width: 18px; height: 18px; }
+
+.jg-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+.jg-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.jg-pick-art {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--fill);
+}
+
+.jg-pick-art canvas,
+.jg-pick-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.jg-pick.is-current .jg-pick-art { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5.5px var(--accent); }
+
+.jg-pick.is-album .jg-pick-art {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.jg-pick.is-album svg { width: 34px; height: 34px; }
+
+.jg-picker-note {
+  color: var(--label-2);
+  font-size: 13px;
+  text-align: center;
+}

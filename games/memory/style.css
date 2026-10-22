@@ -1,0 +1,301 @@
+/* 记忆方格的样式，只作用在 .mem 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.mem {
+  --mem-board: #e3e3e9;
+  --mem-cell: #fff;
+  --mem-a: #4fe3c1; /* 亮起的格子：薄荷绿的双色渐变 */
+  --mem-b: #14a3a8;
+  --mem-seg-on: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mem {
+    --mem-board: #1c1c1e;
+    --mem-cell: #2c2c2e;
+    --mem-seg-on: #636366;
+  }
+}
+
+.mem [hidden] { display: none !important; }
+
+.mem > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* ---------- 模式选择 ---------- */
+
+.mem-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.mem-seg button {
+  flex: 1;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.mem-seg button.is-active {
+  background: var(--mem-seg-on);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* ---------- 回合、分数、要记几格 ---------- */
+
+.mem-top {
+  display: flex;
+  gap: 10px;
+  height: 52px;
+}
+
+.mem-stat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.mem-stat span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.mem-stat strong {
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mem-stat.is-tiles strong { color: var(--mem-b); }
+
+.mem-restart {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 52px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.mem-restart svg { width: 20px; height: 20px; }
+
+.mem-restart:active,
+.mem-again:active,
+.mem-go:active,
+.mem-seg button:active { opacity: 0.7; }
+
+/* ---------- 方格：在剩下的空间里尽量大，保持正方形；旋转模式下整块转 --turn ---------- */
+
+.mem-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.mem-wrap {
+  position: relative;
+  width: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+}
+
+.mem-board {
+  display: grid;
+  grid-template-columns: repeat(var(--size), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--size), minmax(0, 1fr));
+  /* 格子越多缝越窄：3×3 时 13px，7×7 时 7px */
+  gap: calc(17.5px - var(--size) * 1.5px);
+  width: 100%;
+  height: 100%;
+  padding: calc(17.5px - var(--size) * 1.5px);
+  border-radius: 20px;
+  background: var(--mem-board);
+  container-type: inline-size;
+  transform: rotate(var(--turn, 0deg));
+  transition: transform 0.7s var(--ease), box-shadow 0.4s;
+}
+
+/* 换回合时方向直接摆正，不播转回来的动画 */
+.mem-board.is-instant,
+.mem-board.is-instant .mem-cell { transition: none; }
+
+.mem-board.is-passed {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mem-b) 55%, transparent), 0 10px 30px color-mix(in srgb, var(--mem-b) 25%, transparent);
+}
+
+.mem-cell {
+  min-width: 0;
+  border-radius: calc(60cqw / var(--size) / 3);
+  background: var(--mem-cell);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: background-color 0.25s, box-shadow 0.25s;
+}
+
+/* 亮起和点对：和首页封面、2048 的方块是同一种画法，双色渐变加右上角的光泽 */
+.mem-cell.is-lit,
+.mem-cell.is-hit {
+  background:
+    radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.38), transparent 55%),
+    linear-gradient(135deg, var(--mem-a), var(--mem-b));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--mem-b) 40%, transparent);
+}
+
+.mem-cell.is-lit { animation: mem-flip 0.32s var(--ease); }
+.mem-cell.is-hit { animation: mem-pop 0.22s ease; }
+
+.mem-cell.is-wrong {
+  background: var(--danger);
+  animation: mem-shake 0.34s ease;
+}
+
+/* 点错以后亮出漏掉的格子：虚线框 */
+.mem-cell.is-missed {
+  background: color-mix(in srgb, var(--mem-b) 16%, var(--mem-cell));
+  box-shadow: inset 0 0 0 2px var(--mem-b);
+  outline: 2px dashed color-mix(in srgb, var(--mem-b) 70%, transparent);
+  outline-offset: -6px;
+  animation: mem-pop 0.3s ease;
+}
+
+.mem-cell.is-in { animation: mem-in 0.32s var(--ease) var(--d, 0ms) backwards; }
+
+@keyframes mem-flip {
+  from { transform: perspective(300px) rotateY(90deg); }
+}
+
+@keyframes mem-in {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+@keyframes mem-pop {
+  40% { transform: scale(0.88); }
+}
+
+@keyframes mem-shake {
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+/* 开局前、暂停时盖在方格上 */
+.mem-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: mem-fade 0.25s ease both;
+}
+
+@keyframes mem-fade {
+  from { opacity: 0; }
+}
+
+.mem-go {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.mem-overlay p {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+/* ---------- 底部：提示或成绩 ---------- */
+
+.mem-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+}
+
+.mem-hint {
+  text-align: center;
+  text-wrap: balance;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.mem-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 8px 8px 16px;
+  border-radius: 16px;
+  background: var(--fill);
+  animation: mem-fade 0.3s ease both;
+}
+
+.mem-result-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mem-result-text strong {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mem-result-text span {
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.mem-again {
+  flex: none;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}

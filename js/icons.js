@@ -11,6 +11,7 @@ const icons = {
   play: filled('<path d="M7 4.9v14.2c0 .9 1 1.4 1.7 1l11.2-7.1c.7-.4.7-1.5 0-1.9L8.7 3.9C8 3.5 7 4 7 4.9Z"/>'),
   chevronDown: stroked('<path d="m6 9.5 6 6 6-6"/>', 2.6),
   chevronRight: stroked('<path d="m9.5 5.5 6.5 6.5-6.5 6.5"/>', 2.6),
+  question: stroked('<path d="M8.7 8.8a3.4 3.4 0 0 1 6.6 1.1c0 2.4-3.3 2.9-3.3 5"/><circle cx="12" cy="18.9" r="1.3" fill="currentColor" stroke="none"/>', 2.4),
   person: filled('<circle cx="12" cy="8.2" r="4.2"/><path d="M4.4 20c.9-3.7 4-5.9 7.6-5.9s6.7 2.2 7.6 5.9c.2.8-.4 1.5-1.2 1.5H5.6c-.8 0-1.4-.7-1.2-1.5Z"/>'),
   xmark: filled('<circle cx="12" cy="12" r="10"/><path d="m8.6 8.6 6.8 6.8m0-6.8-6.8 6.8" stroke="#fff" stroke-width="2" stroke-linecap="round"/>'),
 };

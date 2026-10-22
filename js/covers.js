@@ -310,4 +310,164 @@ function tubes() {
   return `<g transform="rotate(-12 150 150)">${out}</g>`;
 }
 
-const MOTIFS = { tiles, sudoku, mines, merge, hanoi, blocks, klotski, bird, tubes };
+// 舒尔特方格：5×5 打乱的数字。1 到 4 已经找到、变淡了，虚线是眼睛找过去的路线，拐个弯落到中间白色的 5
+const SCHULTE_BOARD = [
+  [12, 17, 8, 24, 9],
+  [20, 1, 2, 3, 22],
+  [16, 19, 5, 4, 6],
+  [25, 14, 23, 11, 18],
+  [13, 21, 7, 15, 10],
+];
+
+function schulte(game) {
+  const pitch = 64;
+  const size = 54;
+  const center = (r, c) => [150 + (c - 2) * pitch, 150 + (r - 2) * pitch];
+  const at = {};
+  let cells = '';
+  SCHULTE_BOARD.forEach((row, r) => {
+    row.forEach((n, c) => {
+      const [cx, cy] = center(r, c);
+      at[n] = `${cx} ${cy}`;
+      if (n === 5) return;
+      const found = n < 5;
+      cells += `<rect x="${cx - size / 2}" y="${cy - size / 2}" width="${size}" height="${size}" rx="14" fill="#fff" fill-opacity="${found ? 0.1 : 0.22}"/>
+        <text x="${cx}" y="${cy}" ${BOLD} font-size="24" fill="#fff" fill-opacity="${found ? 0.4 : 0.92}">${n}</text>`;
+    });
+  });
+  const [x, y] = center(2, 2);
+  return `<g transform="rotate(-8 150 150)">
+    <path d="M${[1, 2, 3, 4, 5].map((n) => at[n]).join('L')}" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 9"/>
+    ${cells}
+    <rect x="${x - size / 2 - 3}" y="${y - size / 2 - 3}" width="${size + 6}" height="${size + 6}" rx="16" fill="#fff"/>
+    <text x="${x}" y="${y}" ${BOLD} font-size="28" fill="${game.cover.ink}">5</text>
+  </g>`;
+}
+
+// 推箱子：仓库的一角，墙和地面是半透明的方块，小人刚把白色的箱子推到圆圈上。
+// # 墙，. 目标点，$ 箱子，X 推到位的箱子，@ 小人（面朝右）
+const CRATE_ROOM = [
+  '#######',
+  '#  .  #',
+  '# $#  #',
+  '#  @X #',
+  '#. $  #',
+  '#     #',
+  '#######',
+];
+
+function crates(game) {
+  const pitch = 46;
+  const size = 42;
+  let out = '';
+  CRATE_ROOM.forEach((line, r) => {
+    [...line].forEach((ch, c) => {
+      const x = 150 + (c - 3) * pitch - size / 2;
+      const y = 150 + (r - 3) * pitch - size / 2;
+      const cx = x + size / 2;
+      const cy = y + size / 2;
+      out += `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="9" fill="#fff" fill-opacity="${ch === '#' ? 0.32 : 0.1}"/>`;
+      if (ch === '.') out += `<circle cx="${cx}" cy="${cy}" r="9" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="3.5"/>`;
+      if (ch === '$' || ch === 'X') {
+        const done = ch === 'X';
+        out += `<rect x="${x + 3}" y="${y + 3}" width="${size - 6}" height="${size - 6}" rx="8" fill="#fff" fill-opacity="${done ? 1 : 0.55}"/>
+          <rect x="${x + 11}" y="${y + 11}" width="${size - 22}" height="${size - 22}" rx="4" fill="none" stroke="${done ? game.cover.ink : '#fff'}" stroke-opacity=".85" stroke-width="2.5"/>`;
+      }
+      if (ch === '@') {
+        out += `<circle cx="${cx}" cy="${cy}" r="16" fill="#fff"/>
+          <circle cx="${cx - 3}" cy="${cy - 1}" r="3.2" fill="${game.cover.ink}"/><circle cx="${cx + 8}" cy="${cy - 1}" r="3.2" fill="${game.cover.ink}"/>`;
+      }
+    });
+  });
+  return `<g transform="rotate(-8 150 150)">${out}</g>`;
+}
+
+// 拼图：斜放的一整片拼图，中间一块被拿起来挪到右上方，原来的位置空着。
+// 凸起的形状左右对称，所以一条边倒着走、凸起方向反过来，画出来还是同一条边
+const JIGSAW_TAB = [[0.2, 0], [0.5, -0.1], [0.4, 0.1], [0.3, 0.3], [0.7, 0.3], [0.6, 0.1], [0.5, -0.1], [0.8, 0], [1, 0]];
+
+// 从 (x0, y0) 到 (x1, y1) 的一条边；flip 为 1 时凸起朝前进方向的左手边，为 0 是直边
+function jigsawEdge(x0, y0, x1, y1, flip) {
+  if (!flip) return `L${x1} ${y1}`;
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const points = JIGSAW_TAB.map(([along, side]) =>
+    `${(x0 + dx * along - dy * side * flip).toFixed(1)} ${(y0 + dy * along + dx * side * flip).toFixed(1)}`);
+  return `C${points.slice(0, 3).join(' ')}C${points.slice(3, 6).join(' ')}C${points.slice(6).join(' ')}`;
+}
+
+function jigsaw() {
+  const n = 5;
+  const s = 70;
+  const o = 150 - (n * s) / 2;
+  // 横边、竖边上凸起朝哪边，打乱一点免得太整齐
+  const across = (r, c) => (r > 0 && r < n ? ((r * 3 + c * 5) % 4 < 2 ? 1 : -1) : 0);
+  const down = (r, c) => (c > 0 && c < n ? ((r * 7 + c * 3) % 4 < 2 ? 1 : -1) : 0);
+  const outline = (r, c, x0, y0) => {
+    const x1 = x0 + s;
+    const y1 = y0 + s;
+    return `M${x0} ${y0}${jigsawEdge(x0, y0, x1, y0, across(r, c))}${jigsawEdge(x1, y0, x1, y1, down(r, c + 1))}`
+      + `${jigsawEdge(x1, y1, x0, y1, -across(r + 1, c))}${jigsawEdge(x0, y1, x0, y0, -down(r, c))}Z`;
+  };
+  let out = '';
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const d = outline(r, c, o + c * s, o + r * s);
+      out += r === 2 && c === 2
+        ? `<path d="${d}" fill="#000" fill-opacity=".14"/>`
+        : `<path d="${d}" fill="#fff" fill-opacity="${(0.1 + ((r * 5 + c * 3) % 5) * 0.05).toFixed(2)}" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linejoin="round"/>`;
+    }
+  }
+  const lifted = outline(2, 2, o + 2 * s + 30, o + 2 * s - 36);
+  out += `<path d="${lifted}" fill="#000" fill-opacity=".16" transform="translate(5 9)"/><path d="${lifted}" fill="#fff"/>`;
+  return `<g transform="rotate(-10 150 150)">${out}</g>`;
+}
+
+// 记忆方格：深色的方格里亮着几格薄荷绿，外面一圈淡淡的光
+const MEMORY_LIT = [3, 6, 12, 14, 15, 23];
+
+function memory() {
+  const pitch = 52;
+  const size = 44;
+  let out = '';
+  for (let i = 0; i < 25; i++) {
+    const x = 150 + ((i % 5) - 2) * pitch - size / 2;
+    const y = 150 + (Math.floor(i / 5) - 2) * pitch - size / 2;
+    if (MEMORY_LIT.includes(i)) {
+      out += `<rect x="${x - 5}" y="${y - 5}" width="${size + 10}" height="${size + 10}" rx="14" fill="#4fe3c1" fill-opacity=".22"/>
+        <rect x="${x}" y="${y}" width="${size}" height="${size}" rx="10" fill="#4fe3c1"/>`;
+    } else {
+      out += `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="10" fill="#fff" fill-opacity=".12"/>`;
+    }
+  }
+  return `<g transform="rotate(-8 150 150)">${out}</g>`;
+}
+
+// 雨滴算术：斜斜落下的一场雨，中间一颗大白雨滴里是一道竖着写的加法，底下是起伏的水面
+function rain(game) {
+  // 圆心 (x, y)、半径 r 的雨滴：下面是圆，上面收成尖（和游戏里 drop.js 的形状一样）
+  const drop = (x, y, r) => `M${x} ${(y - 1.75 * r).toFixed(1)}L${(x + 0.821 * r).toFixed(1)} ${(y - 0.571 * r).toFixed(1)}`
+    + `A${r} ${r} 0 1 1 ${(x - 0.821 * r).toFixed(1)} ${(y - 0.571 * r).toFixed(1)}Z`;
+  let out = '';
+  for (let row = 0; row < 7; row++) {
+    for (let col = 0; col < 7; col++) {
+      const x = col * 58 + (row % 2) * 29 - 24;
+      const y = row * 60 - 20;
+      if (Math.abs(x - 150) < 62 && Math.abs(y - 150) < 80) continue;
+      const k = (row * 5 + col * 3) % 5;
+      out += `<path d="${drop(x, y, 8 + k * 1.5)}" fill="#fff" fill-opacity="${(0.14 + k * 0.05).toFixed(2)}"/>`;
+    }
+  }
+  const wave = (top, amp, opacity) => {
+    let d = `M-60 360V${top}`;
+    for (let x = -60; x <= 360; x += 20) d += `L${x} ${(top + Math.sin(x / 34) * amp).toFixed(1)}`;
+    return `<path d="${d}V360Z" fill="#fff" fill-opacity="${opacity}"/>`;
+  };
+  // 题目排成一行，和游戏里一样；竖着叠会让“−”看起来像“÷”
+  out += `${wave(262, 7, 0.16)}${wave(276, 6, 0.2)}
+    <path d="${drop(150, 168, 54)}" fill="#fff"/>
+    <text x="150" y="172" ${BOLD} font-size="34" fill="${game.cover.ink}">7<tspan dx="6" font-size="38" fill="#1a8f4c">+</tspan><tspan dx="6">8</tspan></text>`;
+  return `<g transform="rotate(-6 150 150)">${out}</g>`;
+}
+
+const MOTIFS = { tiles, sudoku, mines, merge, hanoi, blocks, klotski, bird, tubes, schulte, crates, jigsaw, memory, rain };

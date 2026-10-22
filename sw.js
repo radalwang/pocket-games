@@ -1,7 +1,7 @@
 // 离线缓存：第一次打开时把所有文件存到手机上，之后没有网络也能打开。
 // 发布新版本时改一下 VERSION，手机下次联网打开时会换成新文件。
 // 新增文件（比如新游戏）时，记得把路径加进 ASSETS。
-const VERSION = 'v0.5.0';
+const VERSION = 'v0.6.0';
 const CACHE = `pocket-games-${VERSION}`;
 const ASSETS = [
   './',
@@ -20,8 +20,10 @@ const ASSETS = [
   'js/views/library.js',
   'js/views/parts.js',
   'js/views/search.js',
+  'games/2048/guide.js',
   'games/2048/index.js',
   'games/2048/style.css',
+  'games/minesweeper/guide.js',
   'games/minesweeper/index.js',
   'games/minesweeper/style.css',
   'games/sudoku/index.js',
@@ -42,6 +44,27 @@ const ASSETS = [
   'games/watersort/index.js',
   'games/watersort/puzzle.js',
   'games/watersort/style.css',
+  'games/schulte/guide.js',
+  'games/schulte/index.js',
+  'games/schulte/style.css',
+  'games/sokoban/index.js',
+  'games/sokoban/levels.js',
+  'games/sokoban/rules.js',
+  'games/sokoban/style.css',
+  'games/jigsaw/guide.js',
+  'games/jigsaw/icons.js',
+  'games/jigsaw/index.js',
+  'games/jigsaw/pictures.js',
+  'games/jigsaw/pieces.js',
+  'games/jigsaw/style.css',
+  'games/memory/guide.js',
+  'games/memory/index.js',
+  'games/memory/style.css',
+  'games/raindrops/drop.js',
+  'games/raindrops/guide.js',
+  'games/raindrops/index.js',
+  'games/raindrops/rules.js',
+  'games/raindrops/style.css',
   'icons/icon-180.png',
   'icons/icon-192.png',
   'icons/icon-512.png',

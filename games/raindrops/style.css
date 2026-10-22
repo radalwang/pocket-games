@@ -1,0 +1,341 @@
+/* 雨滴算术的样式，只作用在 .rd 里面；--accent、--fill、--label 等颜色变量来自外壳。
+   天空里的云、雨滴和水画在 canvas 上，水和云的颜色在这里（--rd-water-top 等），浅色深色各一套 */
+
+.rd {
+  --rd-sky-top: #a3e9f5;
+  --rd-sky-bottom: #3ec4d8;
+  --rd-water-top: #1f7d98;
+  --rd-water-bottom: #13465c;
+  --rd-cloud: rgba(255, 255, 255, 0.45);
+  --rd-mark: rgba(255, 255, 255, 0.8);
+  --rd-drop: #1d4f69;
+  --rd-life: #1fb3cf;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 4px 16px 12px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .rd {
+    --rd-sky-top: #0c2633;
+    --rd-sky-bottom: #164a5c;
+    --rd-water-top: #0f5a74;
+    --rd-water-bottom: #062432;
+    --rd-cloud: rgba(255, 255, 255, 0.06);
+    --rd-mark: rgba(255, 255, 255, 0.4);
+    /* 夜里的天也是深蓝色，雨滴要亮一些才分得清 */
+    --rd-drop: #2a7393;
+    --rd-life: #3cc8e2;
+  }
+}
+
+.rd [hidden] { display: none !important; }
+
+.rd > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* ---------- 分数、最高、还能漏几滴 ---------- */
+
+.rd-top {
+  display: flex;
+  gap: 10px;
+  height: 46px;
+}
+
+/* 「分数」「最高」写在数字上面，数字能用满整格的宽度：iPhone SE 上 999,999 也放得下 */
+.rd-stat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.rd-stat span {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--label-2);
+}
+
+.rd-stat strong {
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rd-stat strong.is-long { font-size: 17px; }
+
+.rd-lives {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.rd-lives svg {
+  width: 15px;
+  height: 21px;
+  fill: var(--rd-life);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.rd-lives svg.is-lost {
+  opacity: 0.22;
+  transform: scale(0.8);
+}
+
+/* ---------- 天空 ---------- */
+
+.rd > .rd-sky {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: linear-gradient(var(--rd-sky-top), var(--rd-sky-bottom));
+}
+
+.rd-sky canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.rd-pause {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.35);
+  color: #0f4a5e;
+}
+
+.rd-pause svg { width: 18px; height: 18px; }
+
+@media (prefers-color-scheme: dark) {
+  .rd-pause {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+}
+
+.rd-count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 76px;
+  font-weight: 800;
+  text-shadow: 0 4px 18px rgba(0, 50, 70, 0.35);
+  pointer-events: none;
+}
+
+.rd-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--bg) 25%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: rd-fade 0.25s ease both;
+}
+
+@keyframes rd-fade {
+  from { opacity: 0; }
+}
+
+.rd-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(100%, 300px);
+  padding: 22px 20px 18px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  box-shadow: 0 12px 30px rgba(0, 40, 60, 0.2);
+  text-align: center;
+}
+
+.rd-panel h3 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.rd-panel p {
+  color: var(--label-2);
+  font-size: 15px;
+  text-wrap: balance;
+}
+
+.rd-panel .rd-note { font-size: 13px; }
+
+.rd-stats {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.rd-stats div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 8px 0;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.rd-stats span {
+  color: var(--label-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rd-stats strong {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rd-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.rd-btn {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 22px;
+  background: var(--fill-2);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.rd-btn.is-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.rd-btn:disabled { opacity: 0.5; }
+
+.rd-btn:active,
+.rd-pause:active { opacity: 0.7; }
+
+/* ---------- 输入框和数字键 ---------- */
+
+.rd-input {
+  display: flex;
+  align-items: center;
+  height: 50px;
+  padding: 0 6px 0 18px;
+  border-radius: 14px;
+  background: var(--fill);
+  transition: background-color 0.2s;
+}
+
+.rd-answer {
+  flex: 1;
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.rd-answer.is-empty {
+  color: var(--label-3);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.rd-back {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--label-2);
+}
+
+.rd-back svg { width: 24px; height: 24px; }
+.rd-back:disabled { opacity: 0.3; }
+
+/* 答错了晃一下、泛一下红 */
+.rd-input.is-wrong {
+  background: color-mix(in srgb, #ff3b30 18%, transparent);
+  animation: rd-shake 0.35s ease;
+}
+
+@keyframes rd-shake {
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+
+.rd-pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rd-pad button {
+  display: grid;
+  place-items: center;
+  height: clamp(42px, 6.6dvh, 56px);
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.08s, background-color 0.08s, opacity 0.2s;
+}
+
+.rd-pad button.is-pressed {
+  background: var(--fill-2);
+  transform: scale(0.95);
+}
+
+.rd-pad .rd-enter {
+  grid-column: span 2;
+  background: var(--accent);
+  color: #fff;
+  font-size: 19px;
+}
+
+.rd-pad .rd-enter.is-pressed {
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+/* 还没开始或者暂停时，键盘变淡 */
+.rd-pad.is-idle button { opacity: 0.45; }

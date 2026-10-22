@@ -1121,7 +1121,156 @@ class WaterSort {
   }
 }
 
+// ---------- 玩法说明 ----------
+// 外壳第一次打开游戏、或者点「?」时显示（见 js/player.js）。配图是简化的管子，水的颜色和小图案都跟游戏里一样
+
+const GUIDE_FONT = 'ui-rounded, -apple-system, system-ui, sans-serif';
+// 配图里的管子：管宽 26，每层水高 16，最下面一层连着圆底高 22，水面上方空 8
+const GUIDE_R = 13;
+const GUIDE_LAYER = 16;
+const GUIDE_BOTTOM = 22;
+const GUIDE_HEAD = 8;
+const num = (v) => String(Math.round(v * 10) / 10);
+const guideArt = (body) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 170" aria-hidden="true">${body}</svg>`;
+const guideText = (x, y, text, size, style) =>
+  `<text x="${x}" y="${y}" text-anchor="middle" font-size="${size}" font-weight="600" font-family="${GUIDE_FONT}" ${style}>${text}</text>`;
+
+// 小图案借用游戏里的画法（MARK_SHAPES）：给它一支只会记路径的假画笔，记下的路径变成 SVG
+function guideMark(color, x, y, r) {
+  const [kind, ink] = MARKS[color];
+  const at = (px, py) => `${num(x + px)} ${num(y + py)}`;
+  let d = '';
+  let out = '';
+  const pen = {
+    beginPath() {
+      d = '';
+    },
+    moveTo(px, py) {
+      d += `M${at(px, py)}`;
+    },
+    lineTo(px, py) {
+      d += `${d ? 'L' : 'M'}${at(px, py)}`;
+    },
+    closePath() {
+      d += 'Z';
+    },
+    rect(px, py, w, h) {
+      d += `M${at(px, py)}h${num(w)}v${num(h)}h${num(-w)}Z`;
+    },
+    arc(px, py, radius) {
+      const a = `a${num(radius)} ${num(radius)} 0 1 0`;
+      d += `M${at(px - radius, py)}${a} ${num(2 * radius)} 0${a} ${num(-2 * radius)} 0`;
+    },
+    fill() {
+      out = `<path d="${d}" fill="${ink}"/>`;
+    },
+    stroke() {
+      out = `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${num(r * 0.3)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    },
+  };
+  MARK_SHAPES[kind](pen, r);
+  return out;
+}
+
+// 一根管子：x 是管口中间，bottom 是管底，layers 从下往上是颜色编号；lift 是拿起来多高，cork 是盖上塞子
+function guideTube(x, bottom, layers, { lift = 0, cork = false } = {}) {
+  const r = GUIDE_R;
+  const y = bottom - lift;
+  const mouth = y - GUIDE_BOTTOM - (CAPACITY - 1) * GUIDE_LAYER - GUIDE_HEAD;
+  // 从左壁往下，绕过半圆底，回到右壁
+  const bowl = `V${y - r}a${r} ${r} 0 0 0 ${2 * r} 0`;
+  let out = `<path d="M${x - r} ${mouth}${bowl}V${mouth}Z" style="fill:var(--fill)"/>`;
+  layers.forEach((color, k) => {
+    const top = y - GUIDE_BOTTOM - k * GUIDE_LAYER;
+    out += k
+      ? `<rect x="${x - r}" y="${top}" width="${2 * r}" height="${GUIDE_LAYER + 0.5}" fill="${PALETTE[color]}"/>`
+      : `<path d="M${x - r} ${top}${bowl}V${top}Z" fill="${PALETTE[color]}"/>`;
+    out += guideMark(color, x, top + (k ? GUIDE_LAYER / 2 : 10), 5.5);
+  });
+  out += `<path d="M${x - r - 2.6} ${mouth}H${x - r}${bowl}V${mouth}H${x + r + 2.6}" fill="none" style="stroke:var(--label-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if (cork) {
+    out += `<rect x="${num(x - 9.4)}" y="${num(mouth - 1.6)}" width="18.7" height="10.4" rx="2" fill="#b07a48"/>`
+      + `<rect x="${num(x - 14.6)}" y="${num(mouth - 8.3)}" width="29.1" height="7.8" rx="2.6" fill="#d9a66e"/>`;
+  }
+  return out;
+}
+
+// 手指点的地方，n 是先后顺序
+const guideTap = (x, y, n) =>
+  `<circle cx="${x}" cy="${y}" r="14" fill="#fff" fill-opacity="0.7" stroke="#000" stroke-opacity="0.2" stroke-width="1.5"/>`
+  + guideText(x, y + 4.5, n, 13, 'fill="#1c1c1e"');
+
+// 倒水的箭头：从 (x1, y1) 往上弯 lift 再落到 (x2, y2)；dashed 的是不能这样倒，弯的最高处打个叉
+function guideArrow(x1, y1, x2, y2, lift, dashed = false) {
+  const cx = (x1 + x2) / 2;
+  const cy = Math.min(y1, y2) - lift;
+  const angle = Math.atan2(y2 - cy, x2 - cx);
+  const head = (a) => `${num(x2 - 8 * Math.cos(angle + a))} ${num(y2 - 8 * Math.sin(angle + a))}`;
+  const line = 'fill="none" style="stroke:var(--label-2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"';
+  let out = `<path d="M${x1} ${y1}Q${num(cx)} ${num(cy)} ${x2} ${y2}" ${line}${dashed ? ' stroke-dasharray="5 6"' : ''}/>`;
+  if (!dashed) return `${out}<path d="M${head(0.5)}L${x2} ${y2}L${head(-0.5)}" ${line}/>`;
+  const mx = num((x1 + 2 * cx + x2) / 4);
+  const my = num((y1 + 2 * cy + y2) / 4);
+  out += `<path d="M-6 -6L6 6M6 -6L-6 6" transform="translate(${mx} ${my})" fill="none" stroke="#ff3b30" stroke-width="3" stroke-linecap="round"/>`;
+  return out;
+}
+
+// 工具栏的按钮：图标、名字，有次数的带个角标
+function guideTool(icon, x, label, badge) {
+  let out = `<g style="color:var(--label-2)">${icon.replace('<svg ', `<svg x="${x - 13}" y="27" width="26" height="26" `)}</g>`;
+  out += guideText(x, 74, label, 12, 'style="fill:var(--label-2)"');
+  if (badge) out += `<rect x="${x + 6}" y="23" width="18" height="14" rx="7" fill="#6e6e73"/>${guideText(x + 15, 33.5, badge, 10, 'fill="#fff"')}`;
+  return out;
+}
+
+const GUIDE = [
+  {
+    title: '把颜色分开',
+    text: '每根管子都只装一种颜色，就过关啦。排好的管子会盖上塞子。',
+    art: guideArt(
+      guideTube(38, 128, [0, 1, 2, 0]) + guideTube(78, 128, [1, 2, 0, 1]) + guideTube(118, 128, [2, 0, 1, 2])
+      + guideArrow(138, 92, 162, 92, 0)
+      + [0, 1, 2].map((color, k) => guideTube(182 + k * 40, 128, [color, color, color, color], { cork: true })).join(''),
+    ),
+  },
+  {
+    title: '点一下倒水',
+    text: '先点一根管子拿起来，再点另一根倒进去。只能倒在同色的水上或空管里，装满为止。',
+    art: guideArt(
+      guideTube(55, 150, [1, 0, 0], { lift: 14 }) + guideTube(150, 150, [2, 0]) + guideTube(245, 150, [3, 1])
+      + guideArrow(62, 50, 146, 62, 20) + guideArrow(58, 46, 241, 62, 40, true)
+      + guideTap(55, 124, 1) + guideTap(150, 138, 2),
+    ),
+  },
+  {
+    title: '认准小图案',
+    text: '每种颜色都有自己的小图案，分不清颜色时认图案就行。',
+    art: guideArt(
+      guideTube(48, 126, [9, 6, 4, 1])
+      + PALETTE.map((color, c) => {
+        const x = 110 + (c % 5) * 38;
+        const y = c < 5 ? 63 : 105;
+        return `<rect x="${x - 15}" y="${y - 15}" width="30" height="30" rx="7" fill="${color}"/>${guideMark(c, x, y, 9)}`;
+      }).join(''),
+    ),
+  },
+  {
+    title: '卡住也不怕',
+    text: '每局能撤销 5 次、加一根空管，还能重来。每种难度都记下最快用时。',
+    art: guideArt(
+      guideTool(UNDO, 60, '撤销', UNDOS) + guideTool(ADD_TUBE, 150, '加空管', 1) + guideTool(REPLAY, 240, '重来')
+      + guideText(150, 101, '最快用时', 11, 'style="fill:var(--label-2)"')
+      + [['easy', '0:58'], ['medium', '2:05'], ['hard', '3:42']].map(([level, time], k) => {
+        const x = 54 + k * 96;
+        return `<rect x="${x - 44}" y="109" width="88" height="30" rx="15" style="fill:var(--fill)"/>`
+          + guideText(x, 129, `${LEVELS[level]} ${time}`, 13, 'style="fill:var(--label)"');
+      }).join(''),
+    ),
+  },
+];
+
 export default {
+  guide: GUIDE,
   async mount(root, ctx) {
     await loadStyles();
     const game = new WaterSort(root, ctx);

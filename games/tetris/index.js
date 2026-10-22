@@ -146,13 +146,7 @@ const TEMPLATE = `
     </div>
   </div>`;
 
-const TOUCH_TIPS = [
-  ['左右拖动', '移动'],
-  ['轻点', '旋转'],
-  ['往下拖', '加速下落'],
-  ['往下一划', '直接落到底'],
-  ['往上一划', '暂存'],
-];
+// 触屏的玩法写在文件末尾的玩法说明（guide）里，这里只留电脑上的按键
 const KEY_TIPS = [
   ['← →', '移动'],
   ['↑ 或 X', '旋转（Z 反着转）'],
@@ -1136,9 +1130,9 @@ class Tetris {
   showIntro() {
     const keyboard = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     this.showOverlay({
-      title: '操作方法',
-      tips: keyboard ? KEY_TIPS : TOUCH_TIPS,
-      text: keyboard ? '' : '也可以用下面的按钮',
+      title: keyboard ? '操作方法' : '准备好了吗',
+      tips: keyboard ? KEY_TIPS : null,
+      text: keyboard ? '' : '忘了怎么玩，可以点上面的 ? 再看一遍',
       actions: [{ label: '开始游戏', primary: true, onClick: () => this.start() }],
     });
   }
@@ -1171,7 +1165,191 @@ class Tetris {
   }
 }
 
+// ---------- 玩法说明 ----------
+// 外壳第一次打开游戏、或者点标题栏的“?”时显示。插图是简化的棋盘：方块和游戏里一样是双色渐变加高光，
+// 空格子、文字和箭头用外壳的颜色变量，深浅色下都看得清
+
+const GUIDE_FONT = 'font-family="ui-rounded, -apple-system, system-ui, sans-serif"';
+const iconBody = (svg) => svg.replace(/^<svg[^>]*>|<\/svg>$/g, '');
+const num = (v) => Math.round(v * 100) / 100;
+
+// 画一页插图：draw 拿到一组画图函数，返回 SVG 内容。渐变 id 带上页码，几页同时在页面上也不会串色
+function guideArt(step, draw) {
+  const id = (name) => `tetris-${step}-${name}`;
+  const used = new Set();
+  const line = (d, extra = '') =>
+    `<path d="${d}" fill="none" style="stroke:var(--label-2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"${extra}/>`;
+  // 箭头尖：(x, y) 是尖端，(ux, uy) 是箭头指的方向
+  const head = (x, y, ux, uy) => {
+    const side = (a) => `${num(x - 7 * (ux * Math.cos(a) - uy * Math.sin(a)))} ${num(y - 7 * (ux * Math.sin(a) + uy * Math.cos(a)))}`;
+    return `M${side(0.6)}L${num(x)} ${num(y)}L${side(-0.6)}`;
+  };
+  const art = {
+    // 棋盘底板和空格子，(x, y) 是左上角第一格的位置
+    board(x, y, cols, rows, s) {
+      const pad = Math.round(s * 0.35);
+      const inset = Math.max(0.75, s * 0.06);
+      let out = `<rect x="${x - pad}" y="${y - pad}" width="${cols * s + pad * 2}" height="${rows * s + pad * 2}" rx="${num(s * 0.7)}" style="fill:var(--fill)"/>`;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          out += `<rect x="${num(x + c * s + inset)}" y="${num(y + r * s + inset)}" width="${num(s - inset * 2)}" height="${num(s - inset * 2)}" rx="${num(s * 0.2)}" style="fill:var(--fill)"/>`;
+        }
+      }
+      return out;
+    },
+    // 一格方块，画法同 drawBlock
+    block(type, x, y, s) {
+      used.add(type);
+      const inset = Math.max(0.75, s * 0.045);
+      const box = `x="${num(x + inset)}" y="${num(y + inset)}" width="${num(s - inset * 2)}" height="${num(s - inset * 2)}" rx="${num(s * 0.22)}"`;
+      return `<rect ${box} fill="url(#${id(type)})"/><rect ${box} fill="url(#${id('shine')})"/>`;
+    },
+    // 落点影子，画法同 drawGhost
+    ghost(type, x, y, s) {
+      const width = Math.max(1.5, s * 0.08);
+      const inset = Math.max(0.75, s * 0.045) + width / 2;
+      const [color] = COLORS[type];
+      return `<rect x="${num(x + inset)}" y="${num(y + inset)}" width="${num(s - inset * 2)}" height="${num(s - inset * 2)}" rx="${num(s * 0.2)}" fill="${color}" fill-opacity=".16" stroke="${color}" stroke-opacity=".8" stroke-width="${num(width)}"/>`;
+    },
+    // 一整个方块，(col, row) 是它旋转方框左上角所在的格子
+    piece(type, rot, col, row, x, y, s, kind = 'block') {
+      return ROTATIONS[type][rot].map(([cx, cy]) => art[kind](type, x + (col + cx) * s, y + (row + cy) * s, s)).join('');
+    },
+    // 已经堆着的方块：每行一个字符串，字母是方块种类，. 是空格；最后一行贴着棋盘底
+    stack(lines, rows, x, y, s) {
+      let out = '';
+      lines.forEach((text, i) => {
+        [...text].forEach((type, c) => {
+          if (SHAPES[type]) out += art.block(type, x + c * s, y + (rows - lines.length + i) * s, s);
+        });
+      });
+      return out;
+    },
+    // 手指按的位置
+    tap: (x, y) => `<circle cx="${x}" cy="${y}" r="14" fill="#fff" fill-opacity=".7" stroke="#000" stroke-opacity=".18" stroke-width="1.5"/>`,
+    // 直线箭头，heads 为 2 时画两层尖，表示甩得很快
+    arrow(x1, y1, x2, y2, heads = 1) {
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const ux = (x2 - x1) / len;
+      const uy = (y2 - y1) / len;
+      let d = `M${x1} ${y1}L${x2} ${y2}`;
+      for (let k = 0; k < heads; k++) d += head(x2 - ux * 6 * k, y2 - uy * 6 * k, ux, uy);
+      return line(d);
+    },
+    // 任意路径加一个箭头尖，(x, y, ux, uy) 是终点和终点处的方向
+    curve: (d, x, y, ux, uy) => line(d + head(x, y, ux, uy)),
+    line,
+    text: (x, y, label, { size = 12, weight = 600, color = 'var(--label-2)' } = {}) =>
+      `<text x="${x}" y="${y}" ${GUIDE_FONT} font-size="${size}" font-weight="${weight}" text-anchor="middle" dominant-baseline="central" style="fill:${color}">${label}</text>`,
+    // 底部按钮：圆底加游戏里同一个图标
+    button(cx, cy, r, icon, main = false) {
+      const k = r * 0.038;
+      const fill = main ? 'fill="#fa2d48"' : 'style="fill:var(--fill)"';
+      const stroke = main ? 'stroke="#fff"' : 'style="stroke:var(--label)"';
+      return `<circle cx="${cx}" cy="${cy}" r="${r}" ${fill}/>`
+        + `<g transform="translate(${num(cx - 12 * k)} ${num(cy - 12 * k)}) scale(${num(k)})" fill="none" ${stroke} stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${iconBody(icon)}</g>`;
+    },
+    // 右侧栏里带标题的小框
+    box: (x, y, w, h, label) =>
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" style="fill:var(--fill)"/>${art.text(x + w / 2, y + 16, label, { size: 11 })}`,
+  };
+  const body = draw(art);
+  const gradients = [...used].map((type) => {
+    const [a, b] = COLORS[type];
+    return `<linearGradient id="${id(type)}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`;
+  }).join('');
+  const shine = `<radialGradient id="${id('shine')}" cx=".82" cy=".12" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`;
+  return `<svg viewBox="0 0 300 170" xmlns="http://www.w3.org/2000/svg"><defs>${gradients}${shine}</defs>${body}</svg>`;
+}
+
+const GUIDE = [
+  {
+    title: '填满一行',
+    text: '方块会一个个落下来，填满一整行就能消掉。堆到最顶上，这一局就结束了。',
+    // 左边：长条正对着缺口往下落；右边：落进去以后这一行填满，亮一下就消掉
+    art: guideArt(1, (a) => {
+      const s = 11;
+      const stack = ['.OO.......', 'JOO.T.....', 'JJJTTT....'];
+      const row = 19 + 11 * s;
+      return a.board(18, 19, 10, 12, s) + a.stack(stack, 12, 18, 19, s)
+        + a.piece('I', 0, 6, 2, 18, 19, s) + a.piece('I', 0, 6, 10, 18, 19, s, 'ghost')
+        + a.arrow(106, 70, 106, 130)
+        + a.line('M145 75l9 10-9 10')
+        + a.board(172, 19, 10, 12, s) + a.stack([...stack.slice(0, 2), 'JJJTTTIIII'], 12, 172, 19, s)
+        + `<rect x="173" y="${num(row + s * 0.1)}" width="${10 * s - 2}" height="${num(s * 0.8)}" rx="${num(s * 0.3)}" fill="#fff" fill-opacity=".8"/>`;
+    }),
+  },
+  {
+    title: '拖动和轻点',
+    text: '在棋盘上左右拖动来移动方块，轻点一下就能旋转。',
+    // 左边：手指按住左右拖；右边：轻点一下，T 转了个方向
+    art: guideArt(2, (a) => {
+      const s = 15;
+      const stack = ['Z...OO', 'ZZ..OO'];
+      const scene = (x) => a.board(x, 14, 6, 7, s) + a.stack(stack, 7, x, 14, s);
+      const cx = 192 + 2.5 * s;
+      const cy = 14 + 2.5 * s;
+      const r = 2.1 * s;
+      const at = (deg) => [num(cx + r * Math.cos((deg * Math.PI) / 180)), num(cy + r * Math.sin((deg * Math.PI) / 180))];
+      const [sx, sy] = at(-115);
+      const [ex, ey] = at(-20);
+      const end = (-20 * Math.PI) / 180;
+      return scene(36) + a.piece('T', 0, 1, 1, 36, 14, s)
+        + a.arrow(81, 81.5, 44, 81.5) + a.arrow(81, 81.5, 118, 81.5) + a.tap(81, 81.5)
+        + a.text(81, 152, '拖动 · 移动')
+        + scene(192) + a.piece('T', 1, 1, 1, 192, 14, s)
+        + a.curve(`M${sx} ${sy}A${r} ${r} 0 0 1 ${ex} ${ey}`, ex, ey, -Math.sin(end), Math.cos(end))
+        + a.tap(237, 89) + a.text(237, 152, '轻点 · 旋转');
+    }),
+  },
+  {
+    title: '上下划动',
+    text: '往下拖加速下落，往下一划直接落到底；往上一划先暂存起来。',
+    // 往下拖、往下一划、往上一划，各画一小块棋盘
+    art: guideArt(3, (a) => {
+      const s = 12;
+      const y = 14;
+      const left = 19;
+      const mid = 101;
+      const right = 183;
+      return a.board(left, y, 5, 9, s) + a.stack(['L...J'], 9, left, y, s)
+        + a.piece('S', 0, 1, 0, left, y, s) + a.piece('S', 0, 1, 7, left, y, s, 'ghost')
+        + a.tap(49, 56) + a.arrow(49, 72, 49, 92) + a.text(49, 148, '加速下落')
+        + a.board(mid, y, 5, 9, s) + a.stack(['O...O'], 9, mid, y, s)
+        + a.line('M115 36V90M147 36V90', ' stroke-opacity=".45"')
+        + a.piece('T', 0, 1, 7, mid, y, s)
+        + a.tap(131, 32) + a.arrow(131, 48, 131, 92, 2) + a.text(131, 148, '直接落到底')
+        + a.board(right, y, 4, 9, s) + a.stack(['J..S'], 9, right, y, s)
+        + a.box(241, 10, 44, 64, '暂存') + a.piece('L', 0, 0, 0, 248, 40, 10)
+        + a.tap(207, 92) + a.curve('M207 78V58Q207 48 217 48H236', 236, 48, 1, 0)
+        + a.text(232, 148, '暂存起来');
+    }),
+  },
+  {
+    title: '用按钮也行',
+    text: '也可以按下面的按钮：左右移动、加速、落到底和旋转。',
+    // 和游戏里的按钮排法一样：左手三个，右手落到底和旋转
+    art: guideArt(4, (a) => a.button(39, 70, 19, LEFT) + a.button(85, 70, 19, DOWN) + a.button(131, 70, 19, RIGHT)
+      + a.button(205, 70, 19, DROP) + a.button(257, 70, 23, ROTATE, true)
+      + a.tap(268, 82)
+      + a.text(39, 112, '左移') + a.text(85, 112, '加速') + a.text(131, 112, '右移')
+      + a.text(205, 112, '落到底') + a.text(257, 112, '旋转')),
+  },
+  {
+    title: '暂存和升级',
+    text: '右边是暂存和接下来的方块，点暂存框也能暂存。每消 10 行升一级，落得更快分更多。',
+    // 右侧栏：暂存、下一个、等级和行数
+    art: guideArt(5, (a) => a.box(40, 20, 100, 66, '暂存') + a.piece('T', 0, 0, 0, 72, 48, 12)
+      + a.tap(128, 76)
+      + a.box(40, 96, 46, 54, '等级') + a.text(63, 132, '2', { size: 20, weight: 700, color: 'var(--label)' })
+      + a.box(94, 96, 46, 54, '行数') + a.text(117, 132, '12', { size: 20, weight: 700, color: 'var(--label)' })
+      + a.box(160, 20, 100, 130, '下一个')
+      + a.piece('I', 0, 0, -1, 190, 57, 10) + a.piece('O', 0, -1, 0, 200, 83, 10) + a.piece('S', 0, 0, 0, 195, 116, 10)),
+  },
+];
+
 export default {
+  guide: GUIDE,
   async mount(root, ctx) {
     await loadStyles();
     const game = new Tetris(root, ctx);

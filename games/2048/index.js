@@ -1,6 +1,8 @@
 // 2048：在 4×4 棋盘上滑动，相同数字的方块碰到一起会合并。
 // 这也是游戏模块的参考写法：导出 mount(root, ctx)，返回 { pause, resume, destroy }（接口说明见 js/player.js）。
 
+import guide from './guide.js';
+
 const SIZE = 4;
 const SLIDE_MS = 110;
 const DIRS = { left: [0, -1], right: [0, 1], up: [-1, 0], down: [1, 0] };
@@ -345,6 +347,7 @@ class Game {
 }
 
 export default {
+  guide,
   async mount(root, ctx) {
     await loadStyles();
     const game = new Game(root, ctx);

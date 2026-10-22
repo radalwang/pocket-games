@@ -61,10 +61,20 @@
       <div class="player-bar">
         <button class="icon-btn" data-action="collapse" aria-label="收起"><span data-icon="chevronDown"></span></button>
         <div class="player-title"></div>
-        <span class="icon-btn-spacer"></span>
+        <button class="icon-btn" data-action="guide" aria-label="玩法介绍"><span data-icon="question"></span></button>
       </div>
     </header>
     <div class="player-stage"></div>
+    <div class="guide" hidden>
+      <div class="guide-card" role="dialog" aria-modal="true" aria-label="玩法介绍">
+        <div class="guide-pages"></div>
+        <div class="guide-foot">
+          <div class="guide-dots"></div>
+          <button class="guide-skip">跳过</button>
+          <button class="guide-next">下一步</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section id="settings" class="sheet" aria-label="设置" inert>

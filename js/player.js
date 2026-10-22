@@ -9,10 +9,13 @@
 //                             记录一项成绩，返回这一项更新后的最好成绩；用时这类越小越好的传 lowerIsBetter: true
 // 卡片上怎么显示成绩，由 registry.js 里这个游戏的 formatRecord 决定。
 // mount 返回的对象可以有 pause()、resume()、destroy()：
-// 收起游戏页或切到后台时调用 pause，回来时调用 resume，卸载时调用 destroy。
+// 收起游戏页、切到后台或打开玩法介绍时调用 pause，回来时调用 resume，卸载时调用 destroy。
+//
+// 模块还可以导出 guide：[{ title, text, art }]，art 是 viewBox 为 0 0 300 170 的 SVG。
+// 第一次打开这个游戏时自动弹出，之后点右上角的“?”再看。
 
 import { getGame } from './registry.js';
-import { progress } from './store.js';
+import { prefs, progress } from './store.js';
 import { cover } from './covers.js';
 import { esc, setBehind, toast } from './ui.js';
 
@@ -25,10 +28,17 @@ const mini = document.getElementById('mini');
 const miniArt = mini.querySelector('.mini-art');
 const miniTitle = mini.querySelector('.mini-title');
 const miniSub = mini.querySelector('.mini-sub');
+const guideButton = sheet.querySelector('[data-action="guide"]');
+const guideEl = sheet.querySelector('.guide');
+const guidePages = guideEl.querySelector('.guide-pages');
+const guideDots = guideEl.querySelector('.guide-dots');
+const guideSkip = guideEl.querySelector('.guide-skip');
+const guideNext = guideEl.querySelector('.guide-next');
 
-let current = null; // { game, instance }
+let current = null; // { game, instance, guide }
 let open = false;
 let opening = false;
+let guideOpen = false;
 
 export const isPlayerOpen = () => open;
 
@@ -42,6 +52,7 @@ export async function openGame(id) {
   opening = true;
   try {
     if (current?.game.id !== id && !(await mountGame(game))) return;
+    if (current.guide && !prefs.get(`guide:${id}`, false)) openGuide();
     expand();
   } finally {
     opening = false;
@@ -97,12 +108,15 @@ async function mountGame(game) {
     }
     toast('存档读取失败，已重新开始');
   }
-  current = { game, instance: instance ?? {} };
+  const guide = Array.isArray(module.default.guide) && module.default.guide.length ? module.default.guide : null;
+  current = { game, instance: instance ?? {}, guide };
+  guideButton.classList.toggle('is-hidden', !guide);
   progress.touch(game.id);
   return true;
 }
 
 function unmountGame() {
+  hideGuide();
   current?.instance.destroy?.();
   current = null;
   stage.replaceChildren();
@@ -114,7 +128,7 @@ function expand() {
   sheet.style.transform = '';
   sheet.classList.add('is-open');
   setBehind(true);
-  current?.instance.resume?.();
+  if (!guideOpen) current?.instance.resume?.();
 }
 
 export function collapse() {
@@ -148,17 +162,85 @@ export function updateMini() {
   miniSub.textContent = save.summary || '继续游戏';
 }
 
+// ---------- 玩法介绍 ----------
+
+// 打开时游戏暂停（计时停下、键盘不再控制游戏），关掉后再继续
+function openGuide() {
+  const steps = current?.guide;
+  if (!steps || guideOpen) return;
+  guideOpen = true;
+  current.instance.pause?.();
+  guidePages.innerHTML = steps.map((step) => `
+    <section class="guide-page">
+      <div class="guide-art">${step.art ?? ''}</div>
+      <h3 class="guide-title">${esc(step.title)}</h3>
+      <p class="guide-text">${esc(step.text)}</p>
+    </section>`).join('');
+  guideDots.innerHTML = steps.map(() => '<span></span>').join('');
+  guideEl.hidden = false;
+  guidePages.scrollLeft = 0;
+  updateGuideFoot();
+  // 先让浏览器排一次版再加 is-open，淡入动画才会播；不用 requestAnimationFrame，页面在后台时它不触发
+  void guideEl.offsetWidth;
+  guideEl.classList.add('is-open');
+}
+
+function closeGuide() {
+  if (!guideOpen) return;
+  prefs.set(`guide:${current.game.id}`, true);
+  hideGuide();
+  if (open && !document.hidden) current.instance.resume?.();
+}
+
+function hideGuide() {
+  guideOpen = false;
+  guideEl.classList.remove('is-open');
+  setTimeout(() => {
+    if (!guideOpen) guideEl.hidden = true;
+  }, 300);
+}
+
+const guidePage = () => Math.round(guidePages.scrollLeft / Math.max(1, guidePages.clientWidth));
+
+function updateGuideFoot() {
+  const count = guideDots.children.length;
+  const page = Math.min(guidePage(), count - 1);
+  [...guideDots.children].forEach((dot, i) => dot.classList.toggle('is-active', i === page));
+  const last = page === count - 1;
+  guideSkip.style.visibility = last ? 'hidden' : '';
+  guideNext.textContent = last ? '知道了' : '下一步';
+}
+
+guideButton.addEventListener('click', openGuide);
+guideSkip.addEventListener('click', closeGuide);
+guidePages.addEventListener('scroll', updateGuideFoot, { passive: true });
+
+guideNext.addEventListener('click', () => {
+  const page = guidePage();
+  if (page >= guideDots.children.length - 1) closeGuide();
+  else guidePages.scrollTo({ left: (page + 1) * guidePages.clientWidth, behavior: 'smooth' });
+});
+
+// 点卡片外面的暗处也能关掉
+guideEl.addEventListener('click', (e) => {
+  if (e.target === guideEl) closeGuide();
+});
+
+// ---------- 收起与暂停 ----------
+
 sheet.querySelector('[data-action="collapse"]').addEventListener('click', collapse);
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && open) collapse();
+  if (e.key !== 'Escape' || !open) return;
+  if (guideOpen) closeGuide();
+  else collapse();
 });
 
 // 锁屏或切到别的 App 时也算暂停，比如扫雷的计时会停下
 document.addEventListener('visibilitychange', () => {
   if (!open) return;
   if (document.hidden) current?.instance.pause?.();
-  else current?.instance.resume?.();
+  else if (!guideOpen) current?.instance.resume?.();
 });
 
 // 按住顶部往下拖可以收起，拖得够远或甩得够快就收起，否则弹回

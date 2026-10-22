@@ -2,6 +2,8 @@
 // 第一下必定安全；点一个周围旗子已经插够的数字，会一次翻开它周围剩下的格子。
 // 接口说明见 js/player.js。
 
+import guide from './guide.js';
+
 const LEVELS = {
   easy: { name: '初级', cols: 9, rows: 9, mines: 10 },
   medium: { name: '中级', cols: 10, rows: 14, mines: 24 },
@@ -516,6 +518,7 @@ class Minesweeper {
 }
 
 export default {
+  guide,
   async mount(root, ctx) {
     await loadStyles();
     const game = new Minesweeper(root, ctx);

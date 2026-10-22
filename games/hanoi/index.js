@@ -657,7 +657,160 @@ class Hanoi {
   }
 }
 
+// 玩法说明：外壳第一次打开这个游戏时、或点标题栏的“?”时一页页显示。
+// 配图是简化的 3 层棋盘，圆盘的渐变和木头柱子的颜色跟游戏里一样；中性的底色、文字和线条用外壳的颜色变量，深色模式下也看得清。
+const GUIDE_X = [55, 150, 245]; // 三根柱子的中线
+const GUIDE_W = [0, 38, 56, 74]; // 圆盘宽度，下标是圆盘大小
+const GUIDE_DISCS = [null, ['#ff7a85', '#ff375f'], ['#ffb057', '#ff7a1a'], ['#ffdf5e', '#f5b400']];
+const GUIDE_OK = '#34c759';
+const GUIDE_BAD = '#ff3b30';
+const GUIDE_ACCENT = '#fa2d48';
+
+// color 是颜色值，或者外壳的颜色变量名（比如 --label-2）
+const guidePaint = (prop, color) => (color.startsWith('--') ? `style="${prop}:var(${color})"` : `${prop}="${color}"`);
+
+function guideText(x, y, text, { size, color, weight = 700 }) {
+  return `<text x="${x}" y="${y}" font-family="ui-rounded, -apple-system, system-ui, sans-serif" font-size="${size}" font-weight="${weight}" text-anchor="middle" dominant-baseline="central" ${guidePaint('fill', color)}>${text}</text>`;
+}
+
+// 第 level 层圆盘的上沿（0 是最底下）
+const guideY = (level, base = 124, dh = 16) => base - (level + 1) * dh + 1;
+
+// 一个圆盘，y 是上沿；mark 是 faded（拖动半路上的影子，变淡）或 hint（提示，外面描一圈强调色）
+function guideDisc(step, size, cx, y, h = 14, mark = '') {
+  const w = GUIDE_W[size];
+  let out = `<rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="url(#hn-${step}-s${size})"${mark === 'faded' ? ' fill-opacity="0.35"' : ''}/>`;
+  if (mark === 'hint') out += `<rect x="${cx - w / 2 - 3}" y="${y - 3}" width="${w + 6}" height="${h + 6}" rx="${h / 2 + 3}" fill="none" stroke="${GUIDE_ACCENT}" stroke-width="2.5"/>`;
+  return out;
+}
+
+// 虚线框出圆盘要去的位置
+function guideGhost(size, cx, y, color) {
+  const w = GUIDE_W[size];
+  return `<rect x="${cx - w / 2 + 0.75}" y="${y + 0.75}" width="${w - 1.5}" height="12.5" rx="6.25" fill="none" ${guidePaint('stroke', color)} stroke-width="1.5" stroke-dasharray="4 3"/>`;
+}
+
+// 一块棋盘：pegs[柱子] 是从下往上的圆盘大小，rods[柱子] 给柱子换颜色（拖动时的绿、红，提示的强调色），marks[圆盘大小] 见 guideDisc。
+// 默认占满整张图；最后一张图上下还要摆层数和按钮，用 y、h、base、top、dh 把它压扁一点
+function guideBoard(step, pegs, { rods = [], marks = {}, y = 6, h = 158, base = 124, top = 56, dh = 16, label = true } = {}) {
+  let out = `<rect x="8" y="${y}" width="284" height="${h}" rx="18" style="fill:var(--fill)"/>`;
+  GUIDE_X.forEach((cx, peg) => {
+    const color = rods[peg];
+    if (color) out += `<rect x="${cx - 6}" y="${top - 3}" width="12" height="${base - top + 5}" rx="6" fill="${color}" fill-opacity="0.25"/>`;
+    out += `<rect x="${cx - 3}" y="${top}" width="6" height="${base - top + 2}" rx="3" fill="${color ?? `url(#hn-${step}-rod)`}"/>`;
+    out += `<rect x="${cx - 41}" y="${base}" width="82" height="8" rx="4" fill="url(#hn-${step}-${peg === TARGET ? 'goal' : 'base'})"/>`;
+    pegs[peg].forEach((size, level) => {
+      out += guideDisc(step, size, cx, guideY(level, base, dh), dh - 2, marks[size]);
+    });
+  });
+  if (label) out += guideText(GUIDE_X[TARGET], base + 22, '终点', { size: 12, color: GUIDE_ACCENT });
+  return out;
+}
+
+const guideTap = (x, y, n = '') =>
+  `<circle cx="${x}" cy="${y}" r="14" fill="#fff" fill-opacity="0.7" stroke="#000" stroke-opacity="0.18" stroke-width="1.5"/>${n && guideText(x, y, n, { size: 13, color: '#1c1c1e' })}`;
+
+// 弧线箭头：从 from 经过控制点 via 弯到 to，箭头顺着末端的方向；dashed 是拖动时手指划过的轨迹
+function guideArrow(from, via, to, dashed = false) {
+  const angle = Math.atan2(to[1] - via[1], to[0] - via[0]);
+  const wing = (turn) => `${(to[0] - 8 * Math.cos(angle + turn)).toFixed(1)} ${(to[1] - 8 * Math.sin(angle + turn)).toFixed(1)}`;
+  const line = 'fill="none" style="stroke:var(--label-2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"';
+  return `<path d="M${from.join(' ')}Q${via.join(' ')} ${to.join(' ')}" ${line}${dashed ? ' stroke-dasharray="1 6"' : ''}/><path d="M${wing(-0.6)}L${to.join(' ')}L${wing(0.6)}" ${line}/>`;
+}
+
+// 圆形小标记：放得下是绿底白勾，放不下是红底白叉
+const guideBadge = (x, y, ok) =>
+  `<circle cx="${x}" cy="${y}" r="9" fill="${ok ? GUIDE_OK : GUIDE_BAD}"/><path d="${ok ? `M${x - 4} ${y}l2.8 3 5-6` : `M${x - 3.5} ${y - 3.5}l7 7m0-7-7 7`}" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+// 顶上选层数的那一排
+function guideLevels(active) {
+  let out = '<rect x="22" y="6" width="257" height="26" rx="9" style="fill:var(--fill)"/>';
+  LEVELS.forEach((n, k) => {
+    const x = 24 + k * 51;
+    if (n === active) out += `<rect x="${x}" y="8" width="49" height="22" rx="7" style="fill:var(--fill)"/>`;
+    out += guideText(x + 24.5, 19, `${n} 层`, { size: 12, weight: n === active ? 700 : 500, color: n === active ? '--label' : '--label-2' });
+  });
+  return out;
+}
+
+// 底部的按钮，图标就用游戏里那两个
+function guideButton(x, y, w, icon, label) {
+  const glyph = icon.replace('<svg ', `<svg x="${x + w / 2 - 27}" y="${y + 7}" width="16" height="16" `).replace('stroke="currentColor"', 'style="stroke:var(--label)"');
+  return `<rect x="${x}" y="${y}" width="${w}" height="30" rx="10" style="fill:var(--fill)"/>${glyph}${guideText(x + w / 2 + 9, y + 15, label, { size: 13, weight: 600, color: '--label' })}`;
+}
+
+// 每张图带自己的渐变，id 前面加上游戏和第几步（比如 hn-1-s3），几张图同时在页面上也不会串
+function guideArt(step, body) {
+  const gradient = (name, [from, to], x2, y2) =>
+    `<linearGradient id="hn-${step}-${name}" x1="0" y1="0" x2="${x2}" y2="${y2}"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient>`;
+  const defs = [
+    ...GUIDE_DISCS.slice(1).map((colors, k) => gradient(`s${k + 1}`, colors, 1, 1)),
+    gradient('rod', ['#e2d6c6', '#c4b29b'], 1, 0),
+    gradient('base', ['#e2d6c6', '#c4b29b'], 0, 1),
+    gradient('goal', ['#ed8a8d', '#e4626a'], 0, 1), // 终点的底座混了一点强调色，和游戏里一样
+  ];
+  return `<svg viewBox="0 0 300 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>${defs.join('')}</defs>${body}</svg>`;
+}
+
+const GUIDE = [
+  {
+    title: '搬到终点',
+    text: '把左边这一摞圆盘，全部搬到最右边的「终点」柱子上就赢了。',
+    art: guideArt(1,
+      guideBoard(1, [[3, 2, 1], [], []]) +
+        [3, 2, 1].map((size, level) => guideGhost(size, GUIDE_X[TARGET], guideY(level), '--label-2')).join('') +
+        guideArrow([62, 66], [150, -8], [234, 66])),
+  },
+  {
+    title: '大盘不压小盘',
+    // 拿起的是中号圆盘：放到小盘上不行，放到空柱子上可以
+    text: '每次只能拿最上面的一个圆盘，而且大盘不能压在小盘上。',
+    art: guideArt(2,
+      guideBoard(2, [[3], [1], []]) +
+        guideDisc(2, 2, GUIDE_X[0], 34) +
+        guideGhost(2, GUIDE_X[1], guideY(1), GUIDE_BAD) +
+        guideGhost(2, GUIDE_X[2], guideY(0), GUIDE_OK) +
+        guideArrow([90, 42], [128, 40], [138, 72]) +
+        guideArrow([90, 32], [220, -4], [232, 92]) +
+        guideBadge(GUIDE_X[1] + 34, guideY(1) + 7, false) +
+        guideBadge(GUIDE_X[2] + 34, guideY(0) + 7, true)),
+  },
+  {
+    title: '点一下拿起',
+    text: '点一根柱子拿起最上面的圆盘，再点另一根柱子放下。点原处就放回去。',
+    art: guideArt(3,
+      guideBoard(3, [[3, 2], [], []]) +
+        guideDisc(3, 1, GUIDE_X[0], 34) +
+        guideGhost(1, GUIDE_X[2], guideY(0), '--label-2') +
+        guideArrow([82, 38], [160, 0], [228, 52]) +
+        guideTap(GUIDE_X[0], 92, '1') +
+        guideTap(GUIDE_X[2], 86, '2')),
+  },
+  {
+    title: '直接拖过去',
+    // 拖着中号圆盘经过小盘（柱子变红）到空柱子上（柱子变绿）；游戏里同一时间只有手指下面那根会亮
+    text: '也可以按住圆盘拖过去。柱子变绿就能放，变红就放不下。',
+    art: guideArt(4,
+      guideBoard(4, [[3], [1], []], { rods: [null, GUIDE_BAD, GUIDE_OK] }) +
+        guideDisc(4, 2, GUIDE_X[1], 58, 14, 'faded') +
+        guideDisc(4, 2, GUIDE_X[2], 58) +
+        guideArrow([64, 92], [110, 10], [210, 62], true) +
+        guideTap(GUIDE_X[2], 90)),
+  },
+  {
+    title: '撤销和提示',
+    text: '走错了就撤销，没头绪就点提示。3 到 7 层各记一个最快用时。',
+    art: guideArt(5,
+      guideLevels(3) +
+        guideBoard(5, [[3, 2], [], [1]], { rods: [null, GUIDE_ACCENT], marks: { 2: 'hint' }, y: 38, h: 90, base: 108, top: 64, dh: 12, label: false }) +
+        guideButton(20, 136, 126, UNDO, '撤销') +
+        guideButton(154, 136, 126, BULB, '提示') +
+        guideTap(212, 151)),
+  },
+];
+
 export default {
+  guide: GUIDE,
   async mount(root, ctx) {
     await loadStyles();
     const game = new Hanoi(root, ctx);

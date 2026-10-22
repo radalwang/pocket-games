@@ -1,0 +1,418 @@
+/* 推箱子的样式，只作用在 .skb 里面（玩法介绍的插图是 .skb-art）；--accent、--fill、--label 等颜色变量来自外壳 */
+
+/* 棋盘的颜色和华容道、2048 一样：浅灰的外框，里面是棋盘底色，地面是一格格更亮的圆角方块 */
+.skb,
+.skb-art {
+  --skb-frame: #d4d4dc;
+  --skb-board: #e3e3e9;
+  --skb-floor: rgba(255, 255, 255, 0.7);
+  --skb-done: #248a3d;
+}
+
+@media (prefers-color-scheme: dark) {
+  .skb,
+  .skb-art {
+    --skb-frame: #2c2c2e;
+    --skb-board: #1c1c1e;
+    --skb-floor: #2c2c2e;
+    --skb-done: #30d158;
+  }
+}
+
+.skb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+.skb [hidden] { display: none !important; }
+
+.skb > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* ---------- 关卡、步数、最好成绩 ---------- */
+
+.skb-top {
+  display: flex;
+  gap: 10px;
+  height: 52px;
+}
+
+.skb-level {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 12px 0 14px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.skb-level-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* “第 12 关 · 最少 107 步”在 iPhone SE 上也要一行放下 */
+.skb-level-text small {
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--label-2);
+}
+
+.skb-level-text strong {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.skb-level svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--label-2);
+  transition: transform 0.25s;
+}
+
+.skb-level.is-open svg { transform: rotate(180deg); }
+
+.skb-stat {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.skb-stat span {
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.skb-stat strong {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+/* ---------- 棋盘：连外框在内，在剩下的空间里尽量大，按关卡的行列数保持比例，一格最大 56px ---------- */
+
+.skb-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+/* 外框和华容道一样：一圈浅灰的边，里面 3px 宽的棋盘底色，再往里才是格子 */
+.skb-frame {
+  --rim: 6px;
+  --pad: 3px;
+  padding: var(--pad);
+  border: var(--rim) solid var(--skb-frame);
+  border-radius: calc(var(--rim) + var(--pad) + 12px);
+  background: var(--skb-board);
+}
+
+.skb-board {
+  --edge: calc(2 * (var(--rim) + var(--pad)));
+  --bw: min(100cqw - var(--edge), (100cqh - var(--edge)) * var(--w) / var(--h), 56px * var(--w));
+  --cell: calc(var(--bw) / var(--w));
+  position: relative;
+  width: var(--bw);
+  height: calc(var(--bw) * var(--h) / var(--w));
+}
+
+.skb-ground svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.skb-things {
+  position: absolute;
+  inset: 0;
+}
+
+/* 箱子和小人：位置由 --r、--c 决定，改变它们时滑过去 */
+.skb-thing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / var(--w));
+  height: calc(100% / var(--h));
+  transform: translate(calc(var(--c) * 100%), calc(var(--r) * 100%));
+  transition: transform 0.14s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+/* 自动走路时匀速一格接一格；跳回去（撤销一整段、读档）时不播动画 */
+.skb-board.is-walking .skb-thing { transition-duration: 85ms; transition-timing-function: linear; }
+.skb-board.is-instant .skb-thing { transition: none; }
+
+.skb-player { z-index: 1; }
+
+/* 箱子：和首页封面、2048 的方块是同一种画法，双色渐变加右上角的光泽；中间一圈白线是箱盖。
+   颜色和 index.js 里 COLORS 的 box、done、stuck 一致 */
+.skb-crate {
+  --a: #ffb547;
+  --b: #ff6a3d;
+  position: absolute;
+  inset: 9%;
+  border-radius: 20%;
+  background:
+    radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.28), transparent 55%),
+    linear-gradient(135deg, var(--a), var(--b));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+}
+
+.skb-crate::before {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  border: max(1.5px, calc(var(--cell) * 0.06)) solid rgba(255, 255, 255, 0.75);
+  border-radius: 12%;
+}
+
+.skb-box.is-done .skb-crate { --a: #30d158; --b: #0a8f6a; }
+.skb-box.is-stuck .skb-crate { --a: #ff6b6b; --b: #d63031; }
+
+/* 小人：蓝色的圆脸，右上角一块高光，两只眼睛看着前进的方向（--fx、--fy） */
+.skb-face {
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 75% 20%, rgba(255, 255, 255, 0.45), transparent 50%),
+    linear-gradient(135deg, #5ac8fa, #1f6fd1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.skb-face::before,
+.skb-face::after {
+  content: "";
+  position: absolute;
+  top: 31%;
+  width: 23%;
+  height: 28%;
+  border-radius: 50%;
+  background: radial-gradient(circle at calc(50% + var(--fx, 0) * 22%) calc(50% + var(--fy, 1) * 22%), #1c1c1e 0 32%, #fff 35%);
+  transform: translate(calc(var(--fx, 0) * 30%), calc(var(--fy, 1) * 22%));
+  transition: transform 0.15s, background 0.15s;
+}
+
+.skb-face::before { left: 22%; }
+.skb-face::after { right: 22%; }
+
+/* ---------- 动画 ---------- */
+
+.skb-thing.enter > * { animation: skb-in 0.34s cubic-bezier(0.2, 0.8, 0.3, 1.25) var(--d, 0ms) backwards; }
+.skb-box.nudge .skb-crate { animation: skb-nudge 0.3s ease; }
+.skb-box.is-landing .skb-crate { animation: skb-pop 0.32s ease; }
+.skb-player.bump .skb-face { animation: skb-bump 0.22s ease; }
+
+/* 提示：箱子外面亮一圈强调色，中间隔一道棋盘底色的缝，压在深色的墙上也看得清 */
+.skb-box.is-hinted .skb-crate { animation: skb-hint 0.9s ease; }
+
+/* 过关：箱子挨个跳一下，小人蹦两下 */
+.skb-board.is-won .skb-crate { animation: skb-pop 0.4s ease calc(0.15s + var(--i, 0) * 90ms) backwards; }
+.skb-board.is-won .skb-face { animation: skb-jump 0.42s ease 0.25s 2; }
+
+@keyframes skb-in {
+  from { opacity: 0; transform: scale(0.5); }
+}
+
+@keyframes skb-nudge {
+  25% { transform: translateX(-8%); }
+  75% { transform: translateX(8%); }
+}
+
+@keyframes skb-bump {
+  40% { transform: translate(calc(var(--fx, 0) * 14%), calc(var(--fy, 0) * 14%)); }
+}
+
+@keyframes skb-pop {
+  50% { transform: scale(1.14); }
+}
+
+@keyframes skb-hint {
+  30% { box-shadow: 0 0 0 2px var(--skb-board), 0 0 0 4.5px var(--accent), 0 6px 16px rgba(0, 0, 0, 0.2); }
+}
+
+@keyframes skb-jump {
+  50% { transform: translateY(-22%) scale(1.04, 0.97); }
+}
+
+.skb-note {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 3;
+  margin: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--glass);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -6px);
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+}
+
+.skb-note.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- 底部：撤销 / 重来 / 提示，过关后换成结果 ---------- */
+
+.skb-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+}
+
+.skb-tools {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.skb-tools button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--fill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.skb-tools svg { width: 21px; height: 21px; }
+.skb-tools button:disabled { opacity: 0.35; cursor: default; }
+
+.skb-tools button:not(:disabled):active,
+.skb-level:active,
+.skb-card:active,
+.skb-next:active { opacity: 0.7; }
+
+.skb-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 48px;
+  padding: 0 6px 0 16px;
+  border-radius: 24px;
+  background: color-mix(in srgb, #34c759 18%, transparent);
+  font-size: 15px;
+  font-weight: 600;
+  animation: skb-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes skb-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.skb-next {
+  flex: none;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ---------- 选关 ---------- */
+
+.skb-picker {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+  padding-bottom: 6px;
+  touch-action: pan-y;
+  animation: skb-rise 0.3s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* iPhone SE 上一张卡片约 142px 宽，减去内边距、缩略图和间距，文字还剩约 68px，四个字的关卡名（15px）也放得下 */
+.skb-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--fill);
+}
+
+.skb-card.is-current { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.skb-card svg {
+  flex: none;
+  width: 46px;
+  height: 46px;
+}
+
+.skb-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.skb-card-text small {
+  font-size: 11px;
+  color: var(--label-2);
+}
+
+.skb-card-text strong {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 两列的卡片在 iPhone SE 上很窄，“最好 107 步”也要一行放下 */
+.skb-card-meta {
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--label-2);
+}
+
+.skb-card-meta.is-done { color: var(--skb-done); font-weight: 600; }

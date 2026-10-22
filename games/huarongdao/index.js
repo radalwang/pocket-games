@@ -14,16 +14,134 @@ const UNDO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 const BULB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3Z"/></svg>';
 const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></svg>';
 
-// 配色分四类：曹操、关羽、其他大将、兵
-const colorOf = (piece) => (piece.kind === 'cao' || piece.kind === 'bing' ? piece.kind : piece.name === '关羽' ? 'guan' : 'general');
+// 棋子的颜色：曹操和五员大将各一组双色渐变（左上 → 右下），和首页封面、2048 的方块是同一种画法。
+// 棋盘上的棋子、选关缩略图和玩法介绍的插图都用这里的颜色；兵是中性色，跟着深浅模式变（见 style.css）。
+// 每关正好五员大将（rules.js 按顺序起名），所以同一关里不会有两员大将同色
+const COLORS = {
+  cao: ['#ff6a3d', '#ff2d6f'],
+  guan: ['#30d158', '#0a8f6a'],
+  zhang: ['#5e5ce6', '#2b2f9e'],
+  zhao: ['#5ac8fa', '#1f6fd1'],
+  ma: ['#bf5af2', '#7a2fc7'],
+  huang: ['#ffb547', '#e0702a'],
+};
+const ROLES = { 曹操: 'cao', 关羽: 'guan', 张飞: 'zhang', 赵云: 'zhao', 马超: 'ma', 黄忠: 'huang' };
+const colorOf = (piece) => ROLES[piece.name] ?? 'bing';
 
-// 选关列表里的小棋盘
-function preview(level) {
-  const rects = parseLayout(level.layout)
-    .map((p) => `<rect class="p-${colorOf(p)}" x="${p.c * 10 + 0.7}" y="${p.r * 10 + 0.7}" width="${p.w * 10 - 1.4}" height="${p.h * 10 - 1.4}" rx="2.2"/>`)
+// ---------- 用 SVG 画的小棋盘：选关缩略图和玩法介绍的插图 ----------
+
+const FAMILY = 'font-family="ui-rounded, \'SF Pro Rounded\', -apple-system, system-ui, sans-serif" dominant-baseline="central"';
+const FONT = `${FAMILY} text-anchor="middle"`;
+
+// 一张图里要用的渐变。id 是名字前缀，同一页上的几张图不能重名；bing 是兵的两个颜色
+function gradients(id, bing) {
+  const linear = Object.entries({ ...COLORS, bing })
+    .map(([key, [a, b]]) => `<linearGradient id="${id}-${key}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:${a}"/><stop offset="1" style="stop-color:${b}"/></linearGradient>`)
     .join('');
-  return `<svg viewBox="0 0 40 50" aria-hidden="true">${rects}</svg>`;
+  return `<defs>${linear}<radialGradient id="${id}-shine" cx="0.85" cy="0.12" r="0.67"><stop offset="0" stop-color="#fff" stop-opacity="0.38"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>`;
 }
+
+// 按布局画棋子：(x, y) 是棋盘左上角，unit 是一格多大，gap 是棋子之间的缝；outline 是兵的描边，浅色的兵放在浅色卡片上也看得出边
+function pieceRects(pieces, id, { x = 0, y = 0, unit, gap, rx, outline }) {
+  return pieces
+    .map((p) => {
+      const box = `x="${x + p.c * unit + gap / 2}" y="${y + p.r * unit + gap / 2}" width="${p.w * unit - gap}" height="${p.h * unit - gap}" rx="${rx}"`;
+      const stroke = outline && p.kind === 'bing' ? ` style="stroke:${outline}" stroke-width="0.8"` : '';
+      return `<rect ${box} fill="url(#${id}-${colorOf(p)})"${stroke}/><rect ${box} fill="url(#${id}-shine)"/>`;
+    })
+    .join('');
+}
+
+// 选关列表里的小棋盘，棋盘和兵的颜色跟着深浅模式走（见 style.css）
+function preview(level) {
+  const id = `hrd-pv-${level.id}`;
+  const pieces = pieceRects(parseLayout(level.layout), id, { unit: 10, gap: 1.4, rx: 2.2 });
+  return `<svg viewBox="0 0 40 50" aria-hidden="true">${gradients(id, ['var(--hrd-bing-a)', 'var(--hrd-bing-b)'])}<rect width="40" height="50" rx="3.5" style="fill:var(--hrd-board)"/>${pieces}</svg>`;
+}
+
+// 玩法介绍里的棋盘（或者棋盘的一角）。介绍卡片在深浅模式下底色不同，所以棋盘、边框和兵用外壳的中性色，曹操和大将的颜色不变。
+// exit 为真时画整个棋盘：边框绕一圈，底边中间留出出口，口子里一道强调色，和游戏里一样
+function sketch(id, layout, { x, y, unit, exit = false }) {
+  const pieces = parseLayout(layout);
+  const w = layout[0].length * unit;
+  const h = layout.length * unit;
+  let out = gradients(id, ['var(--cell)', 'var(--cell)']);
+  out += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" style="fill:var(--fill)"/>`;
+  if (exit) {
+    const [x0, y0, x1, y1, r] = [x - 2.5, y - 2.5, x + w + 2.5, y + h + 2.5, 9.5];
+    const left = x + w / 4 + 2;
+    const right = x + (w * 3) / 4 - 2;
+    out += `<path d="M${right} ${y1}H${x1 - r}A${r} ${r} 0 0 0 ${x1} ${y1 - r}V${y0 + r}A${r} ${r} 0 0 0 ${x1 - r} ${y0}H${x0 + r}A${r} ${r} 0 0 0 ${x0} ${y0 + r}V${y1 - r}A${r} ${r} 0 0 0 ${x0 + r} ${y1}H${left}" fill="none" style="stroke:var(--fill-2)" stroke-width="5"/>`;
+    out += `<path d="M${left + 4} ${y1}H${right - 4}" style="stroke:var(--accent)" stroke-width="2.5" stroke-linecap="round"/>`;
+  }
+  out += pieceRects(pieces, id, { x, y, unit, gap: 3, rx: unit * 0.17, outline: 'var(--label-3)' });
+  const cao = pieces.find((p) => p.kind === 'cao');
+  if (cao) out += `<text x="${x + (cao.c + 1) * unit}" y="${y + (cao.r + 1) * unit}" font-size="${unit * 0.5}" font-weight="700" fill="#fff" ${FONT}>曹操</text>`;
+  return out;
+}
+
+// 手指点的位置：半透明的白圈
+const tapAt = (x, y) => `<circle cx="${x}" cy="${y}" r="14" fill="#fff" fill-opacity="0.7" stroke="#000" stroke-opacity="0.15" stroke-width="1.5"/>`;
+
+// 箭头：d 是箭杆，(tx, ty) 是箭尖，(dx, dy) 是箭尖朝的方向
+function arrow(d, [tx, ty], [dx, dy], color = 'var(--label-2)') {
+  const head = `M${tx - dx * 6 - dy * 5} ${ty - dy * 6 + dx * 5}L${tx} ${ty}L${tx - dx * 6 + dy * 5} ${ty - dy * 6 - dx * 5}`;
+  return `<path d="${d} ${head}" fill="none" style="stroke:${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+// 棋子要去的地方：一个虚线框
+const ghost = (x, y, w, h, rx) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="none" style="stroke:var(--label-2)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+
+const art = (body) => `<svg viewBox="0 0 300 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
+
+// 顶栏的计数和底栏的按钮，画在第三、四步的插图里
+const chip = (x, y, w, h, label, value) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" style="fill:var(--fill)"/>
+  <text x="${x + w / 2}" y="${y + h * 0.3}" font-size="${h > 50 ? 11 : 9.5}" font-weight="600" style="fill:var(--label-2)" ${FONT}>${label}</text>
+  <text x="${x + w / 2}" y="${y + h * 0.68}" font-size="${h * 0.4}" font-weight="700" style="fill:var(--label)" ${FONT}>${value}</text>`;
+const tool = (x, icon, label) => `<rect x="${x}" y="84" width="48" height="52" rx="12" style="fill:var(--fill)"/>
+  ${icon.replace('<svg ', `<svg x="${x + 14}" y="92" width="20" height="20" style="color:var(--label)" `)}
+  <text x="${x + 24}" y="124" font-size="10" font-weight="600" style="fill:var(--label)" ${FONT}>${label}</text>`;
+
+// 玩法介绍：外壳第一次打开游戏时自动弹出，标题栏的“?”也能打开。插图里渐变的名字带上 hrd-步骤号，免得和别的图重名
+const GUIDE = [
+  {
+    title: '帮曹操脱身',
+    text: '把最大的那块曹操挪到棋盘底部正中，他就能从出口逃走啦。',
+    art: art(`${sketch('hrd-1', ['AEED', 'AKLD', 'G..H', 'GBBH', 'IBBJ'], { x: 102, y: 8, unit: 24, exit: true })}
+      ${arrow('M150 137V148', [150, 150], [0, 1], 'var(--accent)')}
+      <text x="150" y="161" font-size="11" font-weight="600" letter-spacing="2" style="fill:var(--accent)" ${FONT}>出口</text>`),
+  },
+  {
+    title: '拖着棋子走',
+    text: '按住棋子拖进空格，路上还能拐弯。棋子只能滑，不能跳过别的棋子。',
+    art: art(`${sketch('hrd-2', ['ABBC', 'ADDC', 'E..F'], { x: 82, y: 34, unit: 34 })}
+      ${ghost(117.5, 103.5, 65, 31, 5.8)}
+      ${tapAt(150, 85)}
+      ${arrow('M150 101V122', [150, 124], [0, 1])}`),
+  },
+  {
+    title: '怎么算步数',
+    text: '同一个棋子连着走只算一步。每关都标着最少步数，看你能不能追平。',
+    art: art(`${sketch('hrd-3', ['S.B', 'C.B', 'CDD'], { x: 34, y: 37, unit: 32 })}
+      ${ghost(67.5, 70.5, 29, 29, 5.4)}
+      ${arrow('M50 53H76Q82 53 82 59V80', [82, 82], [0, 1])}
+      ${chip(156, 58, 56, 54, '步数', 1)}
+      ${chip(222, 58, 56, 54, '最少', 81)}`),
+  },
+  {
+    title: '撤销与提示',
+    text: '走错了就撤销或重来，卡住了点提示替你走一步。点上方的关卡名换关，每关最好成绩都记着。',
+    art: art(`${sketch('hrd-4', LEVELS.find((level) => level.id === 'hengdao').layout, { x: 30, y: 34, unit: 18, exit: true })}
+      <rect x="64.5" y="86.5" width="21" height="21" rx="5.5" fill="none" style="stroke:var(--accent)" stroke-width="2"/>
+      <rect x="122" y="26" width="96" height="44" rx="12" style="fill:var(--fill)"/>
+      <text x="133" y="39" font-size="9.5" font-weight="500" style="fill:var(--label-2)" ${FAMILY}>第 9 关</text>
+      <text x="133" y="56" font-size="14" font-weight="700" style="fill:var(--label)" ${FAMILY}>横刀立马</text>
+      <path d="M199 45.5l4.5 4.5 4.5-4.5" fill="none" style="stroke:var(--label-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      ${chip(224, 26, 54, 44, '最好', 85)}
+      ${tool(122, UNDO, '撤销')}${tool(176, RESTART, '重来')}${tool(230, BULB, '提示')}
+      ${tapAt(254, 104)}`),
+  },
+];
 
 const TEMPLATE = `
   <div class="hrd">
@@ -412,10 +530,16 @@ class Huarongdao {
   render({ enter = false } = {}) {
     this.els = this.pieces.map((p, id) => {
       const el = document.createElement('div');
-      el.className = `hrd-piece k-${colorOf(p)}${p.h > p.w ? ' is-tall' : ''}`;
+      const color = colorOf(p);
+      el.className = `hrd-piece k-${color}${p.h > p.w ? ' is-tall' : ''}`;
       el.dataset.id = id;
       el.style.setProperty('--w', p.w);
       el.style.setProperty('--h', p.h);
+      // 兵的颜色写在 style.css 里（深色模式要换），其余棋子用 COLORS
+      if (COLORS[color]) {
+        el.style.setProperty('--a', COLORS[color][0]);
+        el.style.setProperty('--b', COLORS[color][1]);
+      }
       el.innerHTML = `<div class="hrd-face"><span>${p.name}</span></div>`;
       if (enter) {
         el.classList.add('enter');
@@ -502,6 +626,7 @@ class Huarongdao {
 }
 
 export default {
+  guide: GUIDE,
   async mount(root, ctx) {
     await loadStyles();
     const game = new Huarongdao(root, ctx);

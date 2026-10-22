@@ -126,6 +126,73 @@ export const games = [
     formatRecord: fastest,
     load: () => import('../games/watersort/index.js'),
   },
+  {
+    id: 'schulte',
+    title: '舒尔特方格',
+    tagline: '按顺序找出 1 到 25，练注意力和眼力',
+    category: 'puzzle',
+    status: 'ready',
+    keywords: ['shuerte', 'shuertefangge', 'fangge', 'schulte', '专注力', '注意力'],
+    cover: { colors: ['#6ea8ff', '#2f6bff', '#1b2f9e'], ink: '#18287a', motif: 'schulte' },
+    // 每种大小记最快用时（s3…s6），卡片上显示最大的那种
+    formatRecord: (records) => {
+      const n = [6, 5, 4, 3].find((k) => records[`s${k}`]);
+      return n ? `${n}×${n} 最快 ${(Math.floor(records[`s${n}`] / 100) / 10).toFixed(1)} 秒` : '';
+    },
+    load: () => import('../games/schulte/index.js'),
+  },
+  {
+    id: 'sokoban',
+    title: '推箱子',
+    tagline: '把所有箱子推到圆圈上，只能推不能拉',
+    category: 'puzzle',
+    status: 'ready',
+    keywords: ['tuixiangzi', 'xiangzi', 'sokoban', 'box'],
+    cover: { colors: ['#e8b779', '#b97a45', '#6b4127'], ink: '#5a3520', motif: 'crates' },
+    // 每关记最少用了几步（键是关卡 id），卡片上显示过了几关
+    formatRecord: (records) => {
+      const cleared = Object.keys(records).length;
+      return cleared ? `已过 ${cleared} 关` : '';
+    },
+    load: () => import('../games/sokoban/index.js'),
+  },
+  {
+    id: 'jigsaw',
+    title: '拼图',
+    tagline: '把打散的拼图块拼回一整张画，也能拼自己的照片',
+    category: 'puzzle',
+    status: 'ready',
+    keywords: ['pintu', 'jigsaw', 'puzzle', '照片'],
+    cover: { colors: ['#7b5cff', '#e0559e', '#ff9b54'], ink: '#5a2d91', motif: 'jigsaw' },
+    formatRecord: fastest,
+    load: () => import('../games/jigsaw/index.js'),
+  },
+  {
+    id: 'memory',
+    title: '记忆方格',
+    tagline: '记住亮起的格子，熄灭后把它们点出来',
+    category: 'puzzle',
+    status: 'ready',
+    keywords: ['jiyifangge', 'jiyi', 'memory', 'matrix', '记忆'],
+    cover: { colors: ['#4b5d8a', '#26335c', '#121a33'], ink: '#0f1730', motif: 'memory' },
+    // 两种模式里全对过的最多格子数（tiles、tilesR）
+    formatRecord: (records) => {
+      const most = Math.max(records.tiles ?? 0, records.tilesR ?? 0);
+      return most ? `最多记住 ${most} 格` : '';
+    },
+    load: () => import('../games/memory/index.js'),
+  },
+  {
+    id: 'raindrops',
+    title: '雨滴算术',
+    tagline: '在雨滴落进水里之前，算出里面的加减乘除',
+    category: 'puzzle',
+    status: 'ready',
+    keywords: ['yudisuanshu', 'yudi', 'suanshu', 'xinsuan', 'raindrops', '心算', '口算', '数学'],
+    cover: { colors: ['#4be3e0', '#22a9d6', '#2d5bd0'], ink: '#1d4f69', motif: 'rain' },
+    formatRecord: (records) => (records.score ? `最高 ${fmt(records.score)} 分` : ''),
+    load: () => import('../games/raindrops/index.js'),
+  },
 ];
 
 export const getGame = (id) => games.find((game) => game.id === id);

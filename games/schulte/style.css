@@ -1,0 +1,281 @@
+/* 舒尔特方格的样式，只作用在 .sch 里面；--accent、--fill、--label 等颜色变量来自外壳 */
+
+.sch {
+  --sch-board: #e3e3e9;
+  --sch-cell: #fff;
+  --sch-hit: #2f6bff;
+  --sch-seg-on: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 4px 20px 14px;
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  touch-action: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sch {
+    --sch-board: #1c1c1e;
+    --sch-cell: #2c2c2e;
+    --sch-hit: #5b8cff;
+    --sch-seg-on: #636366;
+  }
+}
+
+.sch [hidden] { display: none !important; }
+
+.sch > * {
+  flex: none;
+  width: min(100%, 440px);
+}
+
+/* ---------- 大小选择 ---------- */
+
+.sch-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+.sch-seg button {
+  flex: 1;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.sch-seg button.is-active {
+  background: var(--sch-seg-on);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* ---------- 下一个、用时、失误 ---------- */
+
+.sch-top {
+  display: flex;
+  gap: 10px;
+  height: 52px;
+}
+
+.sch-stat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.sch-stat span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.sch-stat strong {
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sch-stat.is-next strong { color: var(--sch-hit); }
+
+.sch-restart {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 52px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.sch-restart svg { width: 20px; height: 20px; }
+
+.sch-restart:active,
+.sch-again:active,
+.sch-go:active,
+.sch-seg button:active { opacity: 0.7; }
+
+/* ---------- 方格：在剩下的空间里尽量大，保持正方形 ---------- */
+
+.sch-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.sch-wrap {
+  position: relative;
+  width: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+}
+
+.sch-board {
+  display: grid;
+  grid-template-columns: repeat(var(--size), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--size), minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  border-radius: 20px;
+  background: var(--sch-board);
+  container-type: inline-size;
+  transition: box-shadow 0.4s;
+}
+
+.sch-board.is-finished {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sch-hit) 55%, transparent), 0 10px 30px color-mix(in srgb, var(--sch-hit) 25%, transparent);
+}
+
+.sch-cell {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border-radius: calc(60cqw / var(--size) / 3);
+  background: var(--sch-cell);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  color: var(--label);
+  font-size: calc(40cqw / var(--size));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sch-cell.is-done {
+  background: color-mix(in srgb, var(--sch-hit) 14%, var(--sch-cell));
+  color: color-mix(in srgb, var(--sch-hit) 40%, transparent);
+}
+
+.sch-cell.is-in { animation: sch-in 0.32s var(--ease) var(--d, 0ms) backwards; }
+.sch-cell.pop { animation: sch-pop 0.22s ease; }
+
+.sch-cell.is-wrong {
+  background: color-mix(in srgb, var(--danger) 22%, var(--sch-cell));
+  color: var(--danger);
+  animation: sch-shake 0.34s ease;
+}
+
+@keyframes sch-in {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+@keyframes sch-pop {
+  40% { transform: scale(0.88); }
+}
+
+@keyframes sch-shake {
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+/* 开局前、暂停时盖在方格上，按钮正好在中间，开局时眼睛就落在中间 */
+.sch-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: sch-fade 0.25s ease both;
+}
+
+@keyframes sch-fade {
+  from { opacity: 0; }
+}
+
+.sch-go {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.sch-overlay p {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+/* ---------- 底部：提示或成绩 ---------- */
+
+.sch-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+}
+
+.sch-hint {
+  text-align: center;
+  text-wrap: balance;
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.sch-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 8px 8px 16px;
+  border-radius: 16px;
+  background: var(--fill);
+  animation: sch-fade 0.3s ease both;
+}
+
+.sch-result-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sch-result-text strong {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sch-result-text span {
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.sch-again {
+  flex: none;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
